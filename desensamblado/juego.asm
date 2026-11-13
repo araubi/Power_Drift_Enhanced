@@ -1,0 +1,14447 @@
+; =============================================================================
+; POWER DRIFT (MSX1, Activision 1989) - desensamblado comentado
+; Juego original: (C) SEGA 1989. Versión de Spectrum: John Mullins (programa), Clive
+; Paul (gráficos), Dave Lowe (música y efectos), Software Studios. Conversión a MSX:
+; New Frontier (Barcelona), programa de Zydro, música de Mc Alby (textos del juego).
+;
+; Desensamblado: Claude para araubi, noviembre de 2026. Hecho desde cero
+; (recorrido de saltos + muestreo del PC en openMSX con un HB-20P); no parte de ningún
+; desensamblado ajeno. Se ensambla con sjasmplus o pasmo.
+; En esta versión publicada los datos (gráficos, textos, circuitos, tablas) no van: cada DB
+; es «DS n,RELLENO» y rom/build_rom.py los pone desde la cinta del usuario
+; (tools/extrae_originales.py). El código va comentado.
+; Licencia de los comentarios: CC BY-NC-SA 4.0. El código y los datos son de sus autores.
+;
+; Este fichero es la memoria del juego de 01FDh a FFE4h, tal como la cargan los seis
+; bloques turbo de la cara A (5 x 10000 + 15000 bytes). No usa la BIOS: RAM en las
+; cuatro páginas, IM 1 con JP en 0038h.
+;
+; CAS EQU 1 -> variante de la cinta .cas (LD_BYTES cambiada por TAPIN); CAS EQU 0 -> la del .tsx.
+;
+; Mapa de memoria (aproximado en las zonas de datos):
+;   0000h-00C7h  vectores (el juego pone JP en 0038h)
+;   00C8h-01FCh  cargador de la cinta (lo deja allí "alicia")
+;   01FDh        INICIO: JP ARRANQUE
+;   0200h-02FFh  TABLA_ESPEJO (bits al revés, para dibujar figuras giradas)
+;   0400h-04FFh  atributo de Spectrum -> color del VDP (se calcula al arrancar)
+;   0840h-12DEh  bucle principal, marcador, sonido, textos, cabeza del piloto (10AFh)
+;   283Dh-61E4h  menú: créditos, definir teclas, elección de piloto y circuito,
+;                logotipo 3D, gráficos y datos de los circuitos
+;   61E5h-7C24h  gráficos del menú (se guardan y se reponen al cargar la cara 2)
+;   7C25h-985Fh  gráficos de los coches, decorado y letras
+;   9864h-C4B3h  motor de la carrera
+;   C4B4h-EEFFh  datos del circuito en curso, tablas y variables (E4xxh-E6xxh)
+;   EF00h-FEFFh  búfer de la zona de juego (16 filas x 32 columnas x 8 líneas, por
+;                columnas: cada línea en su página de 256 bytes). Antes de la primera
+;                partida aquí vive el reproductor de la música de presentación.
+;
+; Nombres: los que llevan comentario están comprobados; los que no, son provisionales
+; (por lo que hace la rutina a primera vista). Lxxxx = etiqueta sin nombre.
+; Los datos sin estudiar van como DB.
+; =============================================================================
+
+	ORG 01FDh
+
+;----------------------------------------------------------------------
+; INICIO: Punto de entrada del juego (el cargador salta aquí con todo en RAM, sin BIOS).
+;----------------------------------------------------------------------
+INICIO:
+	JP	ARRANQUE
+
+;----------------------------------------------------------------------
+; TABLA_ESPEJO: 256 bytes: cada byte con sus bits al revés (b7..b0 -> b0..b7). Sirve para
+; dibujar las figuras mirando al otro lado sin guardar dos copias.
+;----------------------------------------------------------------------
+TABLA_ESPEJO:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+
+;----------------------------------------------------------------------
+; BUCLE_PRINCIPAL: Menú -> carrera(s) -> vuelta al menú, para siempre.
+;----------------------------------------------------------------------
+BUCLE_PRINCIPAL:
+	CALL	PREPARA_PARTIDA
+	CALL	PARTIDA
+	JR	BUCLE_PRINCIPAL
+
+;----------------------------------------------------------------------
+; PREPARA_PARTIDA: Menú, elección de piloto y circuito, carga de la cara 2 y datos del circuito.
+;----------------------------------------------------------------------
+PREPARA_PARTIDA:
+	CALL	MENU
+	LD	A,(CIRCUITO)
+	ADD	A,A
+	LD	HL,0C770h
+	CALL	SUMA_A_HL
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	DE,0C4B4h
+	LD	BC,028Eh
+	LDIR
+	CALL	CARGA_CARA_2
+	RET
+
+;----------------------------------------------------------------------
+; INTERCAMBIA: Intercambia BC bytes entre (IX) y (HL).
+;----------------------------------------------------------------------
+INTERCAMBIA:
+	LD	E,(IX)
+	LD	A,(HL)
+	LD	(IX),A
+	LD	(HL),E
+	INC	IX
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	nz,INTERCAMBIA
+	RET
+
+;----------------------------------------------------------------------
+; TEXTO_EN: Escribe un texto: 2 bytes de posición (Spectrum) y letras; la última con
+; el bit 7 puesto.
+;----------------------------------------------------------------------
+TEXTO_EN:
+	LD	A,(HL)
+	LD	(99A5h),A
+	INC	HL
+	LD	A,(HL)
+	LD	(99A6h),A
+	INC	HL
+TEXTO:
+	LD	A,(HL)
+	AND	7Fh
+	CALL	PINTA_LETRA
+	BIT	7,(HL)
+	INC	HL
+	JR	z,TEXTO
+	RET
+
+;----------------------------------------------------------------------
+; SUMA_A_HL: HL = HL + A.
+;----------------------------------------------------------------------
+SUMA_A_HL:
+	ADD	A,L
+	LD	L,A
+	RET	nc
+	INC	H
+	RET
+
+;----------------------------------------------------------------------
+; ALEATORIO: Generador de números aleatorios (congruencial, semilla en 0893h): A = nuevo.
+;----------------------------------------------------------------------
+ALEATORIO:
+	EXX
+	LD	DE,0
+	LD	H,E
+	LD	L,0FDh
+	LD	A,D
+	OR	A
+	SBC	HL,DE
+	SBC	A,0
+	SBC	HL,DE
+	SBC	A,0
+	LD	E,A
+	LD	D,0
+	SBC	HL,DE
+	JR	nc,L08AA
+	INC	HL
+L08AA:
+	LD	(0893h),HL
+	LD	A,L
+	EXX
+	RET
+
+;----------------------------------------------------------------------
+; BAJA_LINEA: Siguiente línea de píxeles en una dirección de pantalla de Spectrum
+; (la rutina clásica DOWN_HL).
+;----------------------------------------------------------------------
+BAJA_LINEA:
+	INC	H
+	LD	A,H
+	AND	7
+	RET	nz
+	DEC	H
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	AND	0F8h
+	LD	H,A
+	RET
+
+;----------------------------------------------------------------------
+; PINTA_MARCADOR_FIJO: Dibuja el marcador de la carrera (rótulos TIME, SCORE, LAP...).
+;----------------------------------------------------------------------
+PINTA_MARCADOR_FIJO:
+	XOR	A
+	CALL	BORRA_PANTALLA
+	LD	HL,4000h
+	CALL	LIMPIA_FILA
+	LD	HL,4780h
+	CALL	LIMPIA_FILA
+	LD	HL,4680h
+	CALL	LIMPIA_FILA
+	LD	DE,5800h
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,0500h
+	LD	A,50h
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	LD	DE,58A0h
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	A,68h
+	CALL	ATRIB_A_COLOR
+	LD	BC,0300h
+	CALL	VRAM_RELLENA
+	LD	HL,0
+	LD	DE,5900h
+	CALL	LB6F3
+	LD	A,6Ah
+	LD	(99CCh),A
+	LD	HL,2407h
+	CALL	TEXTO_EN
+	LD	HL,5800h
+	LD	DE,1Fh
+	XOR	A
+	LD	B,18h
+L0917:
+	PUSH	BC
+	PUSH	HL
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	HL
+	ADD	HL,DE
+	PUSH	HL
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	HL
+	INC	HL
+	POP	BC
+	DJNZ	L0917
+	LD	HL,40A3h
+	LD	B,5
+L0944:
+	LD	(99A5h),HL
+	LD	A,31h
+	CALL	PINTA_LETRA
+	LD	A,L
+	ADD	A,6
+	LD	L,A
+	DJNZ	L0944
+	LD	HL,0E436h
+	LD	DE,0E437h
+	LD	BC,4
+	LD	(HL),0FFh
+	LDIR
+	CALL	PINTA_PUNTOS
+	CALL	PINTA_VUELTA
+	CALL	PINTA_POSICION
+	CALL	PINTA_MARCADOR
+	CALL	PINTA_VELOCIDAD
+	CALL	PINTA_VELOCIMETRO
+	JP	L0989
+
+;----------------------------------------------------------------------
+; LIMPIA_FILA: Borra una fila de caracteres de la pantalla (dirección de Spectrum en HL).
+;----------------------------------------------------------------------
+LIMPIA_FILA:
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	B,20h
+L097B:
+	CALL	VRAM_ESCRIBE_EN
+	LD	A,0FFh
+	OUT	(98h),A	; VDP: datos
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	DJNZ	L097B
+	RET
+L0989:
+	LD	BC,0500h
+	LD	HL,40FAh
+	LD	(99A5h),HL
+L0992:
+	LD	A,(ETAPA)
+	CP	C
+	JR	z,L09B3
+	LD	A,C
+	LD	HL,0E425h
+	CALL	SUMA_A_HL
+	LD	A,(HL)
+	LD	HL,254Bh
+	CALL	SUMA_A_HL
+	LD	A,(HL)
+	LD	(99CCh),A
+	LD	A,7Fh
+	CALL	PINTA_LETRA
+	INC	C
+	DJNZ	L0992
+	RET
+L09B3:
+	LD	A,0F9h
+L09B5:
+	LD	(99CCh),A
+	LD	A,C
+	ADD	A,31h
+	CALL	PINTA_LETRA
+	INC	C
+	LD	A,69h
+	DJNZ	L09B5
+	RET
+PINTA_VELOCIMETRO:
+	LD	HL,58D1h
+	LD	BC,0400h
+	LD	DE,69F9h
+L09CD:
+	LD	A,(0E6F4h)
+	CP	C
+	LD	A,D
+	JR	nz,L09D5
+	LD	A,E
+L09D5:
+	PUSH	HL
+	PUSH	BC
+	CALL	ATRIB_A_COLOR
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	BC
+	POP	HL
+	INC	L
+	INC	C
+	DJNZ	L09CD
+	RET
+
+;----------------------------------------------------------------------
+; PINTA_POSICION: Puesto en carrera (1ST, 2ND...).
+;----------------------------------------------------------------------
+PINTA_POSICION:
+	LD	HL,40F1h
+	LD	(99A5h),HL
+	LD	A,69h
+	LD	(99CCh),A
+	LD	A,(PUESTO)
+	ADD	A,A
+	ADD	A,A
+	ADD	A,1Bh
+	LD	L,A
+	ADC	A,25h
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	CALL	PINTA_LETRA
+	INC	HL
+	LD	A,(HL)
+	CALL	PINTA_LETRA
+	INC	HL
+	LD	A,6Ah
+	LD	(99CCh),A
+	JP	TEXTO
+PINTA_VUELTA:
+	LD	HL,40E6h
+	LD	(99A5h),HL
+	LD	A,69h
+	LD	(99CCh),A
+PINTA_TIEMPO_VUELTA:
+	LD	HL,0E41Fh
+L0A23:
+	LD	B,3
+L0A25:
+	LD	A,(HL)
+	CALL	PINTA_CIFRA
+	INC	L
+	LD	A,(HL)
+	CALL	L0BE9
+	DJNZ	L0A25
+	LD	A,(HL)
+	JP	PINTA_CIFRA
+
+;----------------------------------------------------------------------
+; PINTA_VELOCIDAD: Velocidad en km/h en el marcador.
+;----------------------------------------------------------------------
+PINTA_VELOCIDAD:
+	LD	HL,40DAh
+	LD	(99A5h),HL
+	LD	A,69h
+	LD	(99CCh),A
+	LD	A,(VELOCIDAD)
+	LD	L,A
+	LD	H,0
+	LD	E,L
+	LD	D,H
+	ADD	HL,HL
+	ADD	HL,DE
+	ADD	HL,HL
+	ADD	HL,HL
+	SBC	HL,DE
+	LD	D,A
+	LD	E,0
+	EX	DE,HL
+	SBC	HL,DE
+	LD	A,H
+	LD	C,0FFh
+	LD	B,64h
+L0A58:
+	INC	C
+	SUB	B
+	JR	nc,L0A58
+	ADD	A,B
+	LD	B,A
+	LD	A,C
+	ADD	A,30h
+	CALL	PINTA_LETRA
+	LD	A,B
+	LD	B,10
+	LD	C,0FFh
+L0A69:
+	INC	C
+	SUB	B
+	JR	nc,L0A69
+	ADD	A,B
+	LD	B,A
+	LD	A,C
+	ADD	A,30h
+	CALL	PINTA_LETRA
+	LD	A,B
+	ADD	A,30h
+	CALL	PINTA_LETRA
+	LD	A,(0E6F6h)
+	OR	A
+	LD	A,(VELOCIDAD)
+	JR	z,L0A8A
+	SUB	14h
+	JR	nc,L0A8A
+	ADD	A,14h
+L0A8A:
+	LD	L,A
+	LD	H,0
+	LD	E,L
+	LD	D,H
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,DE
+	LD	DE,0900h
+	EX	DE,HL
+	SBC	HL,DE
+	XOR	A
+	LD	E,L
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,H
+	CALL	PSG_ESCRIBE
+	LD	DE,42h
+	ADD	HL,DE
+	LD	A,4
+	LD	E,L
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,H
+	CALL	PSG_ESCRIBE
+	CALL	EFECTOS_SONIDO
+	RET
+	DS 3,RELLENO
+EFECTO_PEDIDO:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 1,RELLENO
+
+;----------------------------------------------------------------------
+; EFECTOS_SONIDO: Reproduce el efecto de sonido en curso (canal B del PSG); se llama
+; varias veces por vuelta del bucle.
+;----------------------------------------------------------------------
+EFECTOS_SONIDO:
+	LD	A,(EFECTO_PEDIDO)
+	AND	A
+	CALL	nz,EMPIEZA_EFECTO
+	XOR	A
+	LD	(EFECTO_PEDIDO),A
+	LD	A,(0AB9h)
+	AND	A
+	RET	z
+	LD	A,(0AB5h)
+	LD	HL,(0AB6h)
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	AND	A
+	JR	z,L0B6D
+	LD	L,A
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	A,2
+	LD	E,L
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,H
+	CALL	PSG_ESCRIBE
+	LD	HL,0AB5h
+	INC	(HL)
+	RET
+L0B6D:
+	XOR	A
+	LD	(0AB9h),A
+	LD	(EFECTO_PEDIDO),A
+	CALL	CIERRA_TONO_B
+	RET
+EMPIEZA_EFECTO:
+	DEC	A
+	ADD	A,A
+	ADD	A,0BAh
+	LD	L,A
+	ADC	A,10
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	(0AB6h),HL
+	LD	A,1
+	LD	(0AB9h),A
+	XOR	A
+	LD	(0AB5h),A
+	CALL	ABRE_TONO_B
+	RET
+ABRE_TONO_B:
+	LD	A,(PSG_R7)
+	AND	0FDh
+	LD	(PSG_R7),A
+	LD	E,A
+	LD	A,7
+	CALL	PSG_ESCRIBE
+	RET
+CIERRA_TONO_B:
+	LD	A,(PSG_R7)
+	OR	2
+	LD	(PSG_R7),A
+	LD	E,A
+	LD	A,7
+	CALL	PSG_ESCRIBE
+	RET
+PSG_R7:
+	DS 1,RELLENO
+
+;----------------------------------------------------------------------
+; PSG_ESCRIBE: Registro A del PSG = E.
+;----------------------------------------------------------------------
+PSG_ESCRIBE:
+	OUT	(0A0h),A	; PSG: registro
+	EX	AF,AF'
+	LD	A,E
+	OUT	(0A1h),A	; PSG: escribe
+	EX	AF,AF'
+	RET
+PINTA_PUNTOS:
+	LD	HL,40C6h
+	LD	(99A5h),HL
+	LD	A,69h
+	LD	(99CCh),A
+	LD	DE,0E41Ch
+L0BCA:
+	LD	A,(DE)
+	CALL	PINTA_CIFRA
+	LD	A,27h
+	CALL	PINTA_LETRA
+	INC	E
+	LD	A,(DE)
+	CALL	PINTA_BCD
+	LD	A,27h
+	CALL	PINTA_LETRA
+	INC	E
+	LD	A,(DE)
+	JP	PINTA_BCD
+
+;----------------------------------------------------------------------
+; PINTA_BCD: Escribe A como dos cifras BCD.
+;----------------------------------------------------------------------
+PINTA_BCD:
+	PUSH	AF
+	CALL	L0BE9
+	POP	AF
+	JR	PINTA_CIFRA
+L0BE9:
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+PINTA_CIFRA:
+	AND	15
+	ADD	A,30h
+	JP	PINTA_LETRA
+
+;----------------------------------------------------------------------
+; NADA: RET suelto (resto de la versión de Spectrum).
+;----------------------------------------------------------------------
+NADA:
+	RET
+	DS 16,RELLENO
+	DS 2,RELLENO
+L0C07:
+	LD	A,(0E445h)
+	INC	A
+	LD	(0E445h),A
+	AND	2
+	RET	z
+	LD	A,(ETAPA)
+	CP	5
+	LD	HL,24FCh
+	JR	nz,L0C1E
+	LD	HL,2504h
+L0C1E:
+	CALL	POSICION_TEXTO
+	LD	A,(ETAPA)
+	ADD	A,31h
+	CP	36h
+	JP	nz,PINTA_LETRA_GRANDE
+	RET
+POSICION_TEXTO:
+	LD	A,(HL)
+	LD	(99A5h),A
+	INC	HL
+	LD	A,(HL)
+	LD	(99A6h),A
+	INC	HL
+
+;----------------------------------------------------------------------
+; TEXTO_GRANDE: Texto con las letras grandes.
+;----------------------------------------------------------------------
+TEXTO_GRANDE:
+	LD	A,(HL)
+	AND	7Fh
+	CALL	PINTA_LETRA_GRANDE
+	BIT	7,(HL)
+	INC	HL
+	JR	z,TEXTO_GRANDE
+	RET
+
+;----------------------------------------------------------------------
+; MIRA_RECORD: ¿Entra la puntuación en la tabla de récords?
+;----------------------------------------------------------------------
+MIRA_RECORD:
+	LD	B,10
+	LD	HL,257Ah
+L0C47:
+	PUSH	BC
+	CALL	L0CAC
+	JR	c,L0C56
+	LD	BC,14
+	ADD	HL,BC
+	POP	BC
+	DJNZ	L0C47
+	OR	A
+	RET
+L0C56:
+	POP	BC
+	LD	A,10
+	SUB	B
+	LD	(0E445h),A
+	DEC	B
+	PUSH	HL
+	JR	z,L0C73
+	LD	A,B
+	ADD	A,A
+	LD	B,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	SUB	B
+	LD	C,A
+	LD	B,0
+	LD	DE,2605h
+	LD	HL,25F7h
+	LDDR
+L0C73:
+	POP	DE
+	LD	HL,0E41Fh
+	LD	BC,4
+	LDIR
+	LD	A,(CIRCUITO)
+	LD	(DE),A
+	INC	DE
+	LD	HL,0E41Ch
+	LD	BC,3
+	LDIR
+	PUSH	DE
+	LD	A,20h
+	LD	(DE),A
+	INC	DE
+	LD	(DE),A
+	INC	DE
+	LD	(DE),A
+	INC	DE
+	LD	HL,0E42Bh
+	LD	B,3
+L0C97:
+	LD	A,(HL)
+	AND	15
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	LD	C,A
+	INC	HL
+	LD	A,(HL)
+	AND	15
+	OR	C
+	LD	(DE),A
+	INC	HL
+	INC	DE
+	DJNZ	L0C97
+	POP	DE
+	SCF
+	RET
+L0CAC:
+	PUSH	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	LD	DE,0E422h
+	LD	B,4
+	OR	A
+L0CB6:
+	LD	A,(DE)
+	SBC	A,(HL)
+	DEC	DE
+	DEC	HL
+	DJNZ	L0CB6
+	CCF
+	POP	HL
+	RET
+
+;----------------------------------------------------------------------
+; PIDE_INICIALES: ENTER YOUR INITIALS.
+;----------------------------------------------------------------------
+PIDE_INICIALES:
+	PUSH	DE
+	CALL	LETRAS_PEQUENAS
+	LD	A,46h
+	CALL	BORRA_PANTALLA
+	LD	A,47h
+	LD	(99CCh),A
+	LD	HL,24C7h
+	CALL	POSICION_TEXTO
+	LD	HL,40B1h
+	LD	B,20h
+	LD	DE,271Bh
+	LD	IX,26FCh
+L0CDF:
+	PUSH	BC
+	LD	(99A5h),HL
+	LD	A,(DE)
+	CALL	PINTA_LETRA
+	CALL	L0DDA
+	INC	IX
+	POP	BC
+	INC	DE
+	DJNZ	L0CDF
+	LD	BC,0300h
+	LD	HL,486Eh
+	LD	(0E41Ah),HL
+	LD	HL,4001h
+	LD	(0E45Eh),HL
+	LD	HL,4390h
+	CALL	L0D3E
+	LD	IY,271Bh
+	LD	IX,26FBh
+	POP	DE
+L0D0E:
+	PUSH	BC
+	CALL	L0D74
+	LD	A,C
+	POP	BC
+	JR	c,L0D2F
+	LD	C,A
+	CP	1Fh
+	JR	z,L0D2F
+	PUSH	HL
+	LD	HL,(0E41Ah)
+	INC	HL
+	LD	(0E41Ah),HL
+	LD	HL,271Bh
+	CALL	SUMA_A_HL
+	LD	A,(HL)
+	POP	HL
+	LD	(DE),A
+	INC	DE
+	DJNZ	L0D0E
+L0D2F:
+	CALL	LETRAS_NORMALES
+	CALL	TABLA_RECORDS
+	CALL	L109C
+	CALL	ESPERA_2S
+	JP	ESPERA_2S
+L0D3E:
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	LD	DE,273Bh
+	LD	C,12h
+L0D46:
+	LD	B,3
+L0D48:
+	LD	A,(DE)
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	CALL	VRAM_LEE_EN
+	IN	A,(98h)	; VDP: datos
+	EX	DE,HL
+	XOR	(HL)
+	EX	DE,HL
+	PUSH	AF
+	CALL	VRAM_ESCRIBE_EN
+	POP	AF
+	OUT	(98h),A	; VDP: datos
+	POP	BC
+	POP	DE
+	POP	HL
+	INC	DE
+	INC	L
+	DJNZ	L0D48
+	CALL	BAJA_LINEA
+	DEC	L
+	DEC	L
+	DEC	L
+	DEC	C
+	JR	nz,L0D46
+	POP	HL
+	POP	DE
+	POP	BC
+	RET
+L0D74:
+	LD	B,10
+L0D76:
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	CALL	LB639
+	POP	HL
+	POP	DE
+	POP	BC
+	RET	c
+	DJNZ	L0D76
+	PUSH	HL
+	LD	HL,(0E41Ah)
+	LD	(99A5h),HL
+	LD	A,C
+	LD	B,0
+	LD	HL,271Bh
+	ADD	HL,BC
+	LD	A,(HL)
+	CALL	PINTA_LETRA_GRANDE
+	POP	HL
+	CALL	LEE_CONTROLES
+	RRA
+	CCF
+	RET	nc
+	BIT	3,A
+	JR	nz,L0DBD
+	BIT	2,A
+	JR	z,L0D74
+	CALL	L0D3E
+	LD	A,C
+	INC	A
+	AND	1Fh
+	LD	C,A
+	INC	IX
+	JR	nz,L0DB8
+	LD	HL,4390h
+	LD	IX,26FBh
+	JR	L0DD5
+L0DB8:
+	CALL	L0DDA
+	JR	L0DD5
+L0DBD:
+	CALL	L0D3E
+	CALL	L0E01
+	LD	A,C
+	DEC	A
+	AND	1Fh
+	CP	1Fh
+	LD	C,A
+	DEC	IX
+	JR	nz,L0DD5
+	LD	HL,PINTA_CIRCUITOS
+	LD	IX,271Ah
+L0DD5:
+	CALL	L0D3E
+	JR	L0D74
+L0DDA:
+	LD	A,(IX)
+	AND	0F0h
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	RRA
+	JR	nc,L0DE8
+	NEG
+L0DE8:
+	ADD	A,L
+	LD	L,A
+	LD	A,(IX)
+	AND	15
+	SRL	A
+	RET	z
+	LD	B,A
+	JR	nc,L0DFB
+L0DF5:
+	CALL	L0E28
+	DJNZ	L0DF5
+	RET
+L0DFB:
+	CALL	L0E32
+	DJNZ	L0DFB
+	RET
+L0E01:
+	LD	A,(IX)
+	AND	0F0h
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	RRA
+	JR	c,L0E0F
+	NEG
+L0E0F:
+	ADD	A,L
+	LD	L,A
+	LD	A,(IX)
+	AND	15
+	SRL	A
+	RET	z
+	LD	B,A
+	JR	c,L0E22
+L0E1C:
+	CALL	L0E28
+	DJNZ	L0E1C
+	RET
+L0E22:
+	CALL	L0E32
+	DJNZ	L0E22
+	RET
+L0E28:
+	LD	A,L
+	SUB	20h
+	LD	L,A
+	RET	nc
+	LD	A,H
+	SUB	8
+	LD	H,A
+	RET
+L0E32:
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	RET	nc
+	LD	A,H
+	ADD	A,8
+	LD	H,A
+	RET
+SUMA_PUNTOS_ETAPA:
+	LD	A,(0E424h)
+	OR	A
+	RET	nz
+	LD	HL,0E425h
+	LD	DE,0E42Bh
+	LD	BC,6
+	LDIR
+	RET
+
+;----------------------------------------------------------------------
+; LETRAS_PEQUENAS: Elige el juego de letras normal para TEXTO.
+;----------------------------------------------------------------------
+LETRAS_PEQUENAS:
+	LD	HL,08B0h
+	LD	(0A5ECh),HL
+	LD	HL,PINTA_LETRA_GRANDE
+	LD	(0BF2h),HL
+	RET
+LETRAS_NORMALES:
+	LD	HL,BUFER_BAJA
+	LD	(0A5ECh),HL
+	LD	HL,PINTA_LETRA
+	LD	(0BF2h),HL
+	RET
+GAME_OVER:
+	LD	A,46h
+	CALL	BORRA_PANTALLA
+	CALL	LETRAS_PEQUENAS
+	LD	HL,24DCh
+	CALL	POSICION_TEXTO
+	CALL	POSICION_TEXTO
+	LD	HL,486Ch
+	LD	(99A5h),HL
+	CALL	PINTA_TIEMPO_VUELTA
+	CALL	L109C
+	CALL	ESPERA_2S
+	CALL	LETRAS_PEQUENAS
+	LD	A,47h
+	CALL	BORRA_PANTALLA
+	LD	HL,24F0h
+	CALL	POSICION_TEXTO
+	CALL	L109C
+	JP	ESPERA_2S
+
+;----------------------------------------------------------------------
+; BORRA_PANTALLA: Borra patrones y colores (color A en formato Spectrum).
+;----------------------------------------------------------------------
+BORRA_PANTALLA:
+	PUSH	AF
+	LD	HL,0
+	LD	BC,1800h
+	XOR	A
+	CALL	VRAM_RELLENA
+	LD	HL,2000h
+	LD	BC,1800h
+	POP	AF
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	RET
+L0EB4:
+	LD	A,(VELOCIDAD)
+	SRL	A
+	SRL	A
+	INC	A
+	LD	C,0FFh
+L0EBE:
+	INC	C
+	SUB	10
+	JP	nc,L0EBE
+	ADD	A,10
+	LD	E,A
+	LD	A,C
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	OR	E
+	LD	HL,0E422h
+	LD	B,4
+L0ED2:
+	ADC	A,(HL)
+	DAA
+	LD	(HL),A
+	DEC	L
+	LD	A,0
+	DJNZ	L0ED2
+	JP	PINTA_VUELTA
+PINTA_MARCADOR:
+	LD	HL,4000h
+	CALL	LIMPIA_FILA
+	LD	HL,4680h
+	CALL	LIMPIA_FILA
+	LD	HL,4780h
+	CALL	LIMPIA_FILA
+	LD	L,1
+	EXX
+	LD	A,(PUESTO)
+	SUB	2
+	JR	nc,L0EFA
+	XOR	A
+L0EFA:
+	CP	7
+	JR	c,L0F00
+	LD	A,7
+L0F00:
+	LD	(0F29h),A
+	ADD	A,0CBh
+	LD	L,A
+	LD	H,0E6h
+	LD	DE,0E436h
+	LD	BC,05FFh
+L0F0E:
+	LD	A,(DE)
+	CP	(HL)
+	CALL	nz,L0F7C
+	LDI
+	EXX
+	LD	A,L
+	AND	1Fh
+	ADD	A,6
+	LD	L,A
+	EXX
+	DJNZ	L0F0E
+	LD	HL,PUESTO
+	LD	A,(HL)
+	INC	L
+	CP	(HL)
+	RET	z
+	LD	(HL),A
+	LD	C,A
+	LD	E,0
+	LD	HL,40A4h
+	LD	(99A5h),HL
+	LD	H,58h
+	DEC	L
+	LD	B,5
+L0F35:
+	LD	A,E
+	CP	C
+	LD	D,68h
+	JR	nz,L0F3D
+	LD	D,6Fh
+L0F3D:
+	LD	A,E
+	CP	9
+	LD	A,6Dh
+	JR	c,L0F45
+	LD	A,D
+L0F45:
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	BC
+	POP	DE
+	POP	HL
+	LD	A,D
+	LD	(99CCh),A
+	LD	A,E
+	CP	9
+	JR	c,L0F64
+	SUB	10
+L0F64:
+	ADD	A,31h
+	CALL	PINTA_LETRA
+	LD	A,L
+	ADD	A,6
+	LD	L,A
+	INC	A
+	LD	(99A5h),A
+	INC	E
+	DJNZ	L0F35
+	LD	A,1
+	LD	(EFECTO_PEDIDO),A
+	JP	PINTA_POSICION
+L0F7C:
+	LD	A,(HL)
+	EXX
+	ADD	A,12
+	LD	E,A
+	LD	D,0E4h
+	LD	A,(DE)
+	ADD	A,A
+	ADD	A,1Fh
+	LD	E,A
+	ADC	A,18h
+	SUB	E
+	LD	D,A
+	EX	DE,HL
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	D,41h
+	LD	BC,25FFh
+L0F96:
+	PUSH	BC
+	CALL	L338A
+	POP	BC
+	LD	A,E
+	SUB	6
+	LD	E,A
+	INC	D
+	LD	A,D
+	AND	7
+	JP	nz,L0FAC
+	LD	D,40h
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+L0FAC:
+	DJNZ	L0F96
+	LD	A,E
+	AND	1Fh
+	LD	E,A
+	LD	D,58h
+	LD	BC,05FFh
+L0FB7:
+	PUSH	BC
+	CALL	L33AE
+	POP	BC
+	LD	A,E
+	ADD	A,1Ah
+	LD	E,A
+	DJNZ	L0FB7
+	LD	L,E
+	EXX
+	RET
+LEE_CURVA:
+	LD	HL,(0E6F0h)
+	LD	A,(HL)
+	LD	C,A
+	RLA
+	SBC	A,A
+	LD	B,A
+	LD	HL,(0E443h)
+	ADD	HL,BC
+	LD	(0E443h),HL
+	RET
+
+;----------------------------------------------------------------------
+; CARGA_CARA_2: MULTICARGA: guarda 61E5h-7C24h (gráficos del menú) en EF00h y en la
+; VRAM 0800h, lee de la cinta la cara 2 entera (6720 bytes = 12 cabezas de
+; piloto de 560 bytes) sobre 61E5h, copia a 10AFh la del piloto elegido y
+; vuelve a poner el menú en su sitio. El crack de disco cambia el CALL a esta
+; rutina (0862h) por RET.
+;----------------------------------------------------------------------
+CARGA_CARA_2:
+	CALL	PIDE_CARA_2
+	LD	HL,61E5h
+	LD	DE,MUSICA_PRESENTACION
+	LD	BC,1000h
+	LDIR
+	LD	HL,71E5h
+	LD	DE,0800h
+	LD	BC,0A40h
+	CALL	VRAM_COPIA
+	LD	IX,61E5h
+	LD	DE,1A40h
+	CALL	CARGA_CINTA
+	LD	A,(PILOTO)
+	LD	HL,5FB5h
+	LD	DE,0230h
+	INC	A
+	LD	B,A
+L1004:
+	ADD	HL,DE
+	DJNZ	L1004
+	LD	DE,CABEZA_PILOTO
+	LD	BC,0230h
+	LDIR
+	LD	HL,MUSICA_PRESENTACION
+	LD	DE,61E5h
+	LD	BC,1000h
+	LDIR
+	LD	HL,71E5h
+	LD	BC,0A40h
+	CALL	VRAM_LEE
+	CALL	PIDE_PARAR_CINTA
+	RET
+
+;----------------------------------------------------------------------
+; PIDE_CARA_2: REWIND TAPE TO START OF SIDE 2.
+;----------------------------------------------------------------------
+PIDE_CARA_2:
+	CALL	LETRAS_PEQUENAS
+	LD	A,46h
+	CALL	BORRA_PANTALLA
+	LD	HL,1063h
+	CALL	POSICION_TEXTO
+	CALL	POSICION_TEXTO
+	LD	HL,2800h
+	LD	BC,0A40h
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	JP	LETRAS_NORMALES
+
+;----------------------------------------------------------------------
+; PIDE_PARAR_CINTA: STOP THE TAPE AND PRESS FIRE.
+;----------------------------------------------------------------------
+PIDE_PARAR_CINTA:
+	CALL	LETRAS_PEQUENAS
+	LD	A,46h
+	CALL	BORRA_PANTALLA
+	LD	HL,0BCA3h
+	CALL	POSICION_TEXTO
+	CALL	POSICION_TEXTO
+L1059:
+	CALL	LEE_CONTROLES
+	AND	1
+	JR	z,L1059
+	JP	LETRAS_NORMALES
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 1,RELLENO
+BORRA_TODO:
+	LD	HL,0
+	LD	BC,1800h
+	XOR	A
+	CALL	VRAM_RELLENA
+	LD	HL,2000h
+	LD	BC,1800h
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	RET
+L109C:
+	LD	A,46h
+	LD	(99CCh),A
+	LD	HL,2511h
+	CALL	TEXTO_EN
+	LD	A,(CREDITOS)
+	ADD	A,30h
+	JP	PINTA_LETRA
+
+;----------------------------------------------------------------------
+; CABEZA_PILOTO: 5 dibujos (14 líneas x 8 bytes, máscara y dibujo) de la cabeza del piloto
+; vista desde atrás, girando. Se rellena desde la cara 2 de la cinta.
+;----------------------------------------------------------------------
+CABEZA_PILOTO:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 14,RELLENO
+MENU:
+	CALL	MENU_PRINCIPAL
+	CALL	LETRAS_NORMALES
+	CALL	ELIGE_PILOTO
+	LD	A,(PILOTO_MENU)
+	LD	(PILOTO),A
+	RET
+
+;----------------------------------------------------------------------
+; MENU_PRINCIPAL: Logotipo giratorio, texto de créditos que pasa, opciones 1-4 y 0.
+;----------------------------------------------------------------------
+MENU_PRINCIPAL:
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	PON_BORDE
+	CALL	LETRAS_PEQUENAS
+	LD	A,3
+	CALL	BORRA_TODO
+	CALL	LOGO_3D
+	CALL	COLOREA_OPCION
+	LD	A,1
+L2864:
+	CALL	LEE_TECLA
+	AND	A
+	JR	nz,L2864
+	LD	HL,296Bh
+	LD	DE,296Ch
+	LD	BC,01FFh
+	LD	(HL),0
+	LDIR
+	LD	HL,2B6Bh
+	LD	DE,2B6Ch
+	LD	BC,3Fh
+	LD	(HL),45h
+	LDIR
+	LD	DE,5AC0h
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,0200h
+	LD	A,45h
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	LD	DE,L5ADF
+	CALL	DIR_COLOR
+	EX	DE,HL
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	PUSH	HL
+	CALL	VRAM_RELLENA
+	POP	HL
+	INC	H
+	LD	BC,8
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	LD	HL,2F55h
+	LD	(3113h),HL
+	LD	HL,3036h
+	LD	(0E464h),HL
+	XOR	A
+	LD	(3115h),A
+	LD	(3116h),A
+	LD	(2E5Dh),A
+	LD	(55B5h),A
+	CALL	SIGUIENTE_LETRA_CREDITOS
+L28D0:
+	CALL	ALEATORIO
+	CALL	PINTA_OPCIONES
+	CALL	DESPLAZA_CREDITOS
+	LD	A,(55B5h)
+	OR	A
+	JR	z,L28EB
+	CALL	LETRAS_NORMALES
+	CALL	TABLA_RECORDS
+	CALL	ESPERA_TECLA
+	JP	MENU_PRINCIPAL
+L28EB:
+	CALL	LEE_TECLA
+	CP	30h
+	RET	z
+	AND	A
+	JR	z,L28D0
+	CP	31h
+	JR	c,L28D0
+	CP	35h
+	JR	nc,L28D0
+	SUB	30h
+	CP	4
+	CALL	z,DEFINE_TECLAS
+	DEC	A
+	LD	(CONTROL),A
+	ADD	A,A
+	LD	HL,2F13h
+	CALL	SUMA_A_HL
+	LD	E,(HL)
+	INC	HL
+	LD	D,(HL)
+	LD	HL,TECLAS_DEFINIDAS
+	EX	DE,HL
+	LD	BC,11h
+	LDIR
+	CALL	PINTA_OPCIONES
+	JR	L28D0
+PINTA_OPCIONES:
+	LD	DE,4847h
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	BC,2000h
+	ADD	HL,BC
+	LD	B,3
+	LD	A,(CONTROL)
+	LD	E,A
+	XOR	A
+L2931:
+	PUSH	AF
+	PUSH	BC
+	CP	E
+	LD	A,7
+	JR	nz,L293A
+	LD	A,2
+L293A:
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	INC	H
+	INC	H
+	POP	BC
+	POP	AF
+	INC	A
+	DJNZ	L2931
+	XOR	A
+	LD	(55B5h),A
+	RET
+COLOREA_OPCION:
+	LD	B,5
+	LD	HL,3042h
+	LD	A,(CONTROL)
+	LD	C,A
+L2958:
+	LD	A,6
+	SUB	B
+	CP	C
+	LD	A,46h
+	JR	nz,L2962
+	OR	80h
+L2962:
+	LD	(99CCh),A
+	CALL	TEXTO_EN
+	DJNZ	L2958
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+
+;----------------------------------------------------------------------
+; DESPLAZA_CREDITOS: Una vuelta del menú: espera a la interrupción y mueve el rótulo de créditos.
+;----------------------------------------------------------------------
+DESPLAZA_CREDITOS:
+	EI
+	HALT
+	DI
+	PUSH	AF
+	PUSH	BC
+	PUSH	HL
+	LD	HL,298Ah
+	LD	B,10h
+L2D16:
+	PUSH	BC
+	PUSH	HL
+	LD	B,1Eh
+	XOR	A
+L2D1B:
+	RL	(HL)
+	DEC	HL
+	DJNZ	L2D1B
+	POP	HL
+	LD	DE,20h
+	ADD	HL,DE
+	POP	BC
+	DJNZ	L2D16
+	XOR	A
+	LD	(99CCh),A
+	LD	HL,3115h
+	INC	(HL)
+	LD	A,(HL)
+	AND	7
+	JR	nz,L2DAF
+L2D35:
+	LD	HL,3116h
+	LD	A,(HL)
+	OR	A
+	JR	z,L2D49
+	DEC	(HL)
+	JR	nz,L2D45
+	DEC	(HL)
+	LD	A,0FFh
+	LD	(55B5h),A
+L2D45:
+	LD	A,20h
+	JR	L2D6F
+L2D49:
+	LD	HL,(3113h)
+	LD	A,(HL)
+	CP	0FFh
+	JR	nz,L2D6B
+	LD	HL,2F55h
+	LD	(3113h),HL
+	LD	HL,3036h
+	LD	(0E464h),HL
+	XOR	A
+	LD	(2E5Dh),A
+	CALL	SIGUIENTE_LETRA_CREDITOS
+	LD	A,28h
+	LD	(3116h),A
+	JR	L2D35
+L2D6B:
+	INC	HL
+	LD	(3113h),HL
+L2D6F:
+	LD	DE,298Ah
+	LD	L,A
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	A,H
+	ADD	A,4
+	LD	H,A
+	EX	DE,HL
+	LD	A,8
+	LD	BC,20h
+L2D82:
+	EX	AF,AF'
+	LD	A,(DE)
+	LD	(HL),A
+	ADD	HL,BC
+	LD	(HL),A
+	ADD	HL,BC
+	INC	DE
+	EX	AF,AF'
+	DEC	A
+	JR	nz,L2D82
+	LD	HL,2B6Ch
+	LD	DE,2B6Bh
+	LD	BC,1Eh
+	LDIR
+	LD	HL,2B8Ch
+	LD	DE,2B8Bh
+	LD	BC,1Eh
+	LDIR
+	LD	A,(2E5Ch)
+	LD	(2B89h),A
+	LD	(2BA9h),A
+	CALL	SIGUIENTE_LETRA_CREDITOS
+L2DAF:
+	CALL	L2DB9
+	CALL	L2DFA
+	POP	HL
+	POP	BC
+	POP	AF
+	RET
+L2DB9:
+	LD	HL,296Ch
+	LD	DE,1608h
+	EX	DE,HL
+	CALL	VRAM_ESCRIBE_EN
+	EX	DE,HL
+	LD	B,2
+L2DC6:
+	PUSH	BC
+	LD	B,1Fh
+L2DC9:
+	LD	DE,20h
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	DE,0FF01h
+	ADD	HL,DE
+	DJNZ	L2DC9
+	LD	DE,0E0h
+	ADD	HL,DE
+	POP	BC
+	DJNZ	L2DC6
+	RET
+L2DFA:
+	EXX
+	LD	H,4
+	EXX
+	LD	HL,2B6Ch
+	LD	DE,3608h
+	CALL	L2E11
+	LD	HL,2B8Ch
+	LD	DE,3708h
+	CALL	L2E11
+	RET
+L2E11:
+	EX	DE,HL
+	CALL	VRAM_ESCRIBE_EN
+	EX	DE,HL
+	LD	B,1Eh
+L2E18:
+	LD	DE,20h
+	LD	A,(HL)
+	EXX
+	LD	L,A
+	LD	A,(HL)
+	EXX
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	INC	HL
+	DJNZ	L2E18
+	RET
+SIGUIENTE_LETRA_CREDITOS:
+	LD	A,(2E5Dh)
+	OR	A
+	JR	nz,L2E57
+	LD	HL,(0E464h)
+	LD	A,(HL)
+	LD	(2E5Ch),A
+	INC	HL
+	LD	A,(HL)
+	INC	HL
+	LD	(0E464h),HL
+L2E57:
+	DEC	A
+	LD	(2E5Dh),A
+	RET
+	DS 2,RELLENO
+DEFINE_TECLAS:
+	CALL	DESPLAZA_CREDITOS
+	CALL	LEE_TECLA
+	AND	A
+	JR	nz,DEFINE_TECLAS
+	LD	A,44h
+	LD	(99CCh),A
+	CALL	L2E9F
+	LD	HL,3090h
+	CALL	TEXTO_EN
+	LD	B,8
+	LD	IX,2F3Ch
+L2E7B:
+	LD	A,44h
+	LD	(99CCh),A
+	CALL	TEXTO_EN
+L2E83:
+	CALL	DESPLAZA_CREDITOS
+	CALL	L2EDF
+	JR	nc,L2E83
+L2E8B:
+	CALL	DESPLAZA_CREDITOS
+	CALL	LEE_TECLA
+	AND	A
+	JR	nz,L2E8B
+	DJNZ	L2E7B
+	CALL	L2E9F
+	CALL	COLOREA_OPCION
+	LD	A,3
+	RET
+L2E9F:
+	LD	DE,4840h
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	BC,0B00h
+	XOR	A
+	CALL	VRAM_RELLENA
+	LD	DE,5940h
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,0B00h
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+L2EDF:
+	PUSH	BC
+	CALL	LEE_TECLA
+	POP	BC
+	AND	A
+	RET	z
+	LD	(IX),D
+	INC	IX
+	LD	(IX),E
+	INC	IX
+	SCF
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 11,RELLENO
+
+;----------------------------------------------------------------------
+; ELIGE_PILOTO: SELECT YOUR DRIVER / SELECT YOUR COURSE.
+;----------------------------------------------------------------------
+ELIGE_PILOTO:
+	EI
+	CALL	PREPARA_CARAS
+	CALL	PINTA_FONDO_SELECCION
+	LD	A,2
+	LD	(PILOTO_MENU),A
+	LD	A,2
+	LD	(CIRCUITO),A
+	CALL	L32DE
+	LD	A,1
+	LD	(3243h),A
+	CALL	PINTA_CIRCUITOS
+	LD	A,47h
+	LD	(99CCh),A
+	DI
+	LD	HL,30EBh
+	CALL	TEXTO_EN
+	CALL	MUEVE_SELECCION
+	LD	A,(PILOTO_MENU)
+	LD	(PILOTO),A
+	LD	HL,412Dh
+	CALL	PINTA_PILOTOS
+	LD	A,47h
+	LD	(99CCh),A
+	LD	HL,30FFh
+	CALL	TEXTO_EN
+	LD	HL,5800h
+	LD	DE,MUSICA_PRESENTACION
+	LD	BC,0300h
+	LDIR
+	CALL	MARCA_CIRCUITO
+	CALL	ELIGE_CIRCUITO
+	RET
+ELIGE_CIRCUITO:
+	LD	A,2
+	LD	(CIRCUITO),A
+L3186:
+	CALL	PINTA_CIRCUITOS
+	LD	B,10
+L318B:
+	EI
+	HALT
+	DI
+	DJNZ	L318B
+	CALL	LEE_CONTROLES
+	LD	C,A
+	AND	18h
+	JR	nz,L319D
+	LD	A,1
+	LD	(3243h),A
+L319D:
+	LD	A,C
+	RRA
+	RET	c
+	RRA
+	RRA
+	RRA
+	JR	nc,L31CA
+	LD	A,(3243h)
+	CP	2
+	JR	z,L31B4
+	INC	A
+	CP	2
+	LD	(3243h),A
+	JR	nz,L3186
+L31B4:
+	CALL	PINTA_CIRCUITOS
+	LD	A,(CIRCUITO)
+	INC	A
+	CP	5
+	JR	nc,L3186
+L31BF:
+	CALL	L3287
+	LD	(CIRCUITO),A
+	CALL	MARCA_CIRCUITO
+	JR	L3186
+L31CA:
+	RRA
+	JR	nc,L3186
+	LD	A,(3243h)
+	OR	A
+	JR	z,L31DC
+	DEC	A
+	LD	(3243h),A
+	JR	nz,L3186
+	CALL	PINTA_CIRCUITOS
+L31DC:
+	LD	A,(CIRCUITO)
+	DEC	A
+	JP	m,L3186
+	JR	L31BF
+MUEVE_SELECCION:
+	CALL	ANIMA_SELECCION
+L31E8:
+	CALL	LEE_CONTROLES
+	LD	C,A
+	RRA
+	RET	c
+	RRA
+	RRA
+	RRA
+	JR	nc,L320A
+	LD	A,(3243h)
+	CP	2
+	JR	z,L321C
+	INC	A
+	CP	2
+	JR	z,L321C
+L31FF:
+	LD	(3243h),A
+	LD	(3244h),A
+	CALL	PINTA_CIRCUITOS
+	JR	MUEVE_SELECCION
+L320A:
+	RRA
+	JR	nc,L3218
+	LD	A,(3243h)
+	OR	A
+	JR	z,L321C
+	DEC	A
+	JR	nz,L31FF
+	JR	L321C
+L3218:
+	LD	A,1
+	JR	L31FF
+L321C:
+	LD	(3243h),A
+	LD	HL,3244h
+	CP	(HL)
+	JR	z,L3235
+	LD	(HL),A
+	LD	A,(PILOTO_MENU)
+	LD	(PILOTO),A
+	LD	HL,412Dh
+	CALL	PINTA_PILOTOS
+	CALL	PINTA_CIRCUITOS
+L3235:
+	LD	A,(3243h)
+	OR	A
+	PUSH	AF
+	CALL	nz,L43E0
+	POP	AF
+	CALL	z,L4404
+	JR	L31E8
+	DS 2,RELLENO
+MARCA_CIRCUITO:
+	LD	A,(CIRCUITO)
+	ADD	A,A
+	ADD	A,0B5h
+	LD	L,A
+	ADC	A,53h
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	A,(CIRCUITO)
+	LD	C,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,A
+	ADD	A,1
+	LD	E,A
+	ADC	A,59h
+	SUB	E
+	LD	D,A
+	LD	B,6
+L3264:
+	PUSH	BC
+	CALL	L33AE
+	LD	BC,1Ah
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	POP	BC
+	DJNZ	L3264
+	RET
+	DS 16,RELLENO
+	DS 5,RELLENO
+L3287:
+	PUSH	AF
+	LD	DE,5901h
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	B,6
+L3291:
+	PUSH	BC
+	LD	BC,0F0h
+	LD	A,38h
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	POP	BC
+	INC	H
+	DJNZ	L3291
+	POP	AF
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 11,RELLENO
+L32DE:
+	LD	HL,4020h
+	CALL	L3306
+	LD	HL,47C0h
+	CALL	L3306
+	LD	A,(PILOTO_MENU)
+	SUB	2
+	JP	p,L32F4
+	ADD	A,12
+L32F4:
+	LD	(PILOTO),A
+	LD	HL,4121h
+	LD	B,5
+L32FC:
+	CALL	PINTA_PILOTOS
+	LD	A,L
+	ADD	A,6
+	LD	L,A
+	DJNZ	L32FC
+	RET
+L3306:
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	B,20h
+L330D:
+	CALL	VRAM_ESCRIBE_EN
+	XOR	A
+	OUT	(98h),A	; VDP: datos
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	DJNZ	L330D
+	RET
+	DS 11,RELLENO
+
+;----------------------------------------------------------------------
+; PINTA_PILOTOS: Dibuja las 5 caras de piloto visibles (12 en total, giran).
+;----------------------------------------------------------------------
+PINTA_PILOTOS:
+	PUSH	BC
+	PUSH	HL
+	PUSH	HL
+	LD	HL,4020h
+	CALL	L3306
+	LD	HL,47C0h
+	CALL	L3306
+	POP	HL
+	LD	A,(PILOTO)
+	EX	DE,HL
+	ADD	A,A
+	ADD	A,0D6h
+	LD	L,A
+	ADC	A,34h
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	B,2Eh
+	PUSH	DE
+L3348:
+	PUSH	BC
+	CALL	L338A
+	LD	A,E
+	SUB	6
+	LD	E,A
+	INC	D
+	LD	A,D
+	AND	7
+	JP	nz,L3361
+	DEC	D
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	ADC	A,D
+	SUB	E
+	AND	0F8h
+	LD	D,A
+L3361:
+	POP	BC
+	DJNZ	L3348
+	POP	DE
+	LD	A,D
+	RRCA
+	RRCA
+	RRCA
+	AND	3
+	OR	58h
+	LD	D,A
+	LD	B,6
+L3370:
+	PUSH	BC
+	CALL	L33AE
+	LD	A,E
+	ADD	A,1Ah
+	LD	E,A
+	POP	BC
+	DJNZ	L3370
+	LD	A,(PILOTO)
+	INC	A
+	CP	12
+	JR	c,L3384
+	XOR	A
+L3384:
+	LD	(PILOTO),A
+	POP	HL
+	POP	BC
+	RET
+L338A:
+	PUSH	HL
+	PUSH	DE
+	CALL	DIR_PATRON
+	LD	B,6
+	EX	DE,HL
+L3392:
+	CALL	VRAM_ESCRIBE_EN
+	LD	A,(DE)
+	OUT	(98h),A	; VDP: datos
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	INC	DE
+	DJNZ	L3392
+	POP	DE
+	POP	HL
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	RET
+L33AE:
+	PUSH	HL
+	PUSH	DE
+	CALL	DIR_COLOR
+	LD	B,6
+	EX	DE,HL
+L33B6:
+	PUSH	BC
+	CALL	VRAM_ESCRIBE_EN
+	LD	B,8
+	LD	A,(DE)
+	CALL	ATRIB_A_COLOR
+L33C0:
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	DJNZ	L33C0
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	INC	DE
+	POP	BC
+	DJNZ	L33B6
+	POP	DE
+	POP	HL
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	RET
+PILOTO_MENU:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 1,RELLENO
+ANIMA_SELECCION:
+	EI
+	HALT
+	DI
+	LD	A,(34D5h)
+	INC	A
+	AND	3
+	LD	(34D5h),A
+	LD	C,A
+	ADD	A,A
+	ADD	A,A
+	LD	HL,33DEh
+	CALL	SUMA_A_HL
+	EX	DE,HL
+	LD	HL,402Dh
+	LD	B,6
+L3459:
+	CALL	L34A2
+	INC	L
+	DJNZ	L3459
+	LD	HL,10h
+	ADD	HL,DE
+	EX	DE,HL
+	LD	HL,44CDh
+	LD	B,6
+L3469:
+	CALL	L34A2
+	INC	L
+	DJNZ	L3469
+	LD	A,(34D5h)
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	LD	HL,33FEh
+	CALL	SUMA_A_HL
+	EX	DE,HL
+	LD	HL,402Dh
+	LD	B,6
+L3481:
+	LD	C,15
+	CALL	L34B3
+	CALL	L0E32
+	DJNZ	L3481
+	LD	HL,20h
+	ADD	HL,DE
+	EX	DE,HL
+	LD	HL,4032h
+	LD	B,6
+L3495:
+	LD	C,0F0h
+	CALL	L34B3
+	CALL	L0E32
+	DJNZ	L3495
+	RET
+	DS 2,RELLENO
+L34A2:
+	PUSH	DE
+	PUSH	HL
+	PUSH	BC
+	EX	DE,HL
+	CALL	DIR_PATRON
+	LD	BC,4
+	CALL	VRAM_COPIA
+	POP	BC
+	POP	HL
+	POP	DE
+	RET
+L34B3:
+	PUSH	DE
+	PUSH	HL
+	PUSH	BC
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	B,8
+L34BD:
+	CALL	VRAM_LEE_EN
+	IN	A,(98h)	; VDP: datos
+	AND	C
+	EX	DE,HL
+	OR	(HL)
+	EX	DE,HL
+	PUSH	AF
+	CALL	VRAM_ESCRIBE_EN
+	POP	AF
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	INC	DE
+	DJNZ	L34BD
+	POP	BC
+	POP	HL
+	POP	DE
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 9,RELLENO
+PINTA_CIRCUITOS:
+	DI
+	LD	A,(3243h)
+	ADD	A,A
+	ADD	A,75h
+	LD	L,A
+	ADC	A,54h
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	DE,4BCEh
+	LD	B,1Ah
+L43A3:
+	PUSH	BC
+	CALL	L43C0
+	LD	A,E
+	SUB	4
+	LD	E,A
+	INC	D
+	LD	A,D
+	AND	7
+	JP	nz,L43BC
+	DEC	D
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	ADC	A,D
+	SUB	E
+	AND	0F8h
+	LD	D,A
+L43BC:
+	POP	BC
+	DJNZ	L43A3
+	RET
+L43C0:
+	PUSH	HL
+	PUSH	DE
+	CALL	DIR_PATRON
+	LD	B,4
+	EX	DE,HL
+L43C8:
+	CALL	VRAM_ESCRIBE_EN
+	LD	A,(DE)
+	OUT	(98h),A	; VDP: datos
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	INC	DE
+	DJNZ	L43C8
+	POP	DE
+	POP	HL
+	INC	E
+	INC	E
+	INC	E
+	INC	E
+	INC	HL
+	INC	HL
+	INC	HL
+	INC	HL
+	RET
+L43E0:
+	LD	A,(PILOTO_MENU)
+	SUB	2
+	JR	nc,L43E9
+	ADD	A,12
+L43E9:
+	LD	(55B3h),A
+	LD	A,1
+	LD	(55B4h),A
+	LD	C,1
+	CALL	L4428
+	LD	A,(PILOTO_MENU)
+	INC	A
+	CP	12
+	JR	c,L4400
+	SUB	12
+L4400:
+	LD	(PILOTO_MENU),A
+	RET
+L4404:
+	LD	A,(PILOTO_MENU)
+	SUB	3
+	JR	nc,L440D
+	ADD	A,12
+L440D:
+	LD	(55B3h),A
+	LD	A,5
+	LD	(55B4h),A
+	LD	C,0FFh
+	CALL	L4428
+	LD	A,(PILOTO_MENU)
+	DEC	A
+	CP	12
+	JR	c,L4424
+	ADD	A,12
+L4424:
+	LD	(PILOTO_MENU),A
+	RET
+L4428:
+	LD	A,(55B3h)
+	LD	B,A
+	ADD	A,A
+	ADD	A,B
+	ADD	A,A
+	LD	B,A
+	LD	A,(55B4h)
+	ADD	A,B
+	LD	HL,0EA00h
+	CALL	SUMA_A_HL
+	LD	B,6
+L443C:
+	PUSH	BC
+	PUSH	HL
+	PUSH	BC
+	LD	B,2Eh
+	LD	DE,4121h
+L4444:
+	PUSH	BC
+	PUSH	HL
+	PUSH	DE
+	CALL	L5365
+	POP	HL
+	CALL	BAJA_LINEA
+	EX	DE,HL
+	POP	HL
+	LD	BC,66h
+	ADD	HL,BC
+	POP	BC
+	DJNZ	L4444
+	LD	B,6
+	LD	DE,5821h
+L445C:
+	PUSH	BC
+	PUSH	HL
+	PUSH	DE
+	CALL	L5388
+	POP	HL
+	LD	BC,20h
+	ADD	HL,BC
+	EX	DE,HL
+	POP	HL
+	LD	BC,66h
+	ADD	HL,BC
+	POP	BC
+	DJNZ	L445C
+	POP	BC
+	POP	HL
+	LD	A,C
+	RLA
+	SBC	A,A
+	LD	B,A
+	ADD	HL,BC
+	POP	BC
+	DEC	B
+	JP	nz,L443C
+	RET
+PINTA_FONDO_SELECCION:
+	CALL	BORRA_TODO
+	EXX
+	LD	B,0
+	LD	HL,44EDh
+	EXX
+	LD	HL,40E1h
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	B,1Eh
+L4491:
+	PUSH	BC
+	PUSH	HL
+	LD	B,11h
+L4495:
+	PUSH	BC
+	PUSH	HL
+	CALL	VRAM_ESCRIBE_EN
+	LD	B,8
+L449C:
+	CALL	L44DA
+	OUT	(98h),A	; VDP: datos
+	DJNZ	L449C
+	POP	HL
+	POP	BC
+	INC	H
+	DJNZ	L4495
+	POP	HL
+	POP	BC
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	DJNZ	L4491
+	LD	HL,58E0h
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	B,11h
+L44BA:
+	PUSH	BC
+	PUSH	HL
+	CALL	VRAM_ESCRIBE_EN
+	LD	B,20h
+L44C1:
+	CALL	L44DA
+	LD	L,A
+	LD	H,4
+	LD	A,(HL)
+	PUSH	BC
+	LD	B,8
+L44CB:
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	DJNZ	L44CB
+	POP	BC
+	DJNZ	L44C1
+	POP	HL
+	INC	H
+	POP	BC
+	DJNZ	L44BA
+	RET
+L44DA:
+	EXX
+	LD	A,B
+	OR	A
+	JR	nz,L44E9
+	LD	A,(HL)
+	INC	HL
+	CP	22h
+	JR	nz,L44EB
+	LD	E,(HL)
+	INC	HL
+	LD	B,(HL)
+	INC	HL
+L44E9:
+	LD	A,E
+	DEC	B
+L44EB:
+	EXX
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 8,RELLENO
+L5365:
+	PUSH	HL
+	PUSH	DE
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	B,1Eh
+L536D:
+	LD	A,L
+	OUT	(99h),A	; VDP: control
+	LD	A,H
+	OR	40h
+	OUT	(99h),A	; VDP: control
+	LD	A,(DE)
+	OUT	(98h),A	; VDP: datos
+	LD	A,L
+	ADD	A,8
+	LD	L,A
+	INC	DE
+	DJNZ	L536D
+	LD	BC,1Eh
+	POP	HL
+	ADD	HL,BC
+	EX	DE,HL
+	POP	HL
+	ADD	HL,BC
+	RET
+L5388:
+	EXX
+	LD	H,4
+	EXX
+	PUSH	HL
+	PUSH	DE
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	B,1Eh
+L5394:
+	PUSH	BC
+	PUSH	HL
+	PUSH	DE
+	LD	A,(DE)
+	EXX
+	LD	L,A
+	LD	A,(HL)
+	EXX
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	DE
+	INC	DE
+	POP	HL
+	LD	BC,8
+	ADD	HL,BC
+	POP	BC
+	DJNZ	L5394
+	LD	BC,1Eh
+	POP	HL
+	ADD	HL,BC
+	EX	DE,HL
+	POP	HL
+	ADD	HL,BC
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 15,RELLENO
+
+;----------------------------------------------------------------------
+; LOGO_3D: Logotipo POWER DRIFT que gira en 3D en el menú.
+;----------------------------------------------------------------------
+LOGO_3D:
+	LD	HL,2000h
+	LD	BC,1000h
+	LD	A,46h
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	LD	HL,3000h
+	LD	BC,0800h
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	LD	HL,0
+	LD	BC,1800h
+	XOR	A
+	CALL	VRAM_RELLENA
+	LD	HL,0146h
+	LD	(55B8h),HL
+	XOR	A
+	LD	(5802h),A
+	LD	(58E0h),A
+	CALL	L6000
+	CALL	LOGO_BORRA_BUFER
+	LD	A,0
+	LD	(59C5h),A
+	LD	IX,55BCh
+	LD	IY,296Bh
+	CALL	L58E1
+	CALL	L5D5A
+	CALL	LOGO_BORRA_BUFER
+	LD	HL,5719h
+	CALL	L5ADD
+L5858:
+	EI
+	HALT
+	DI
+	LD	A,(59C5h)
+	ADD	A,8
+	LD	(59C5h),A
+	LD	IX,55BCh
+	LD	IY,296Bh
+	CALL	L58E1
+	CALL	VUELCA_LOGO
+	CALL	L5D5A
+	CALL	LOGO_BORRA_BUFER
+	LD	HL,5719h
+	CALL	L5ADD
+	LD	HL,(55B8h)
+	LD	DE,0FFFFh
+	ADD	HL,DE
+	LD	(55B8h),HL
+	LD	A,(5802h)
+	ADD	A,4
+	LD	(5802h),A
+	CALL	LEE_TECLA
+	AND	A
+	JR	nz,L58A3
+	LD	A,(58E0h)
+	INC	A
+	LD	(58E0h),A
+	CP	21h
+	JP	nz,L5858
+	JR	L58D0
+L58A3:
+	CALL	VUELCA_LOGO
+	XOR	A
+	LD	(59C5h),A
+	LD	HL,80h
+	LD	(5802h),HL
+	LD	HL,0126h
+	LD	(55B8h),HL
+	LD	IX,55BCh
+	LD	IY,296Bh
+	CALL	L58E1
+	CALL	L5D5A
+	CALL	LOGO_BORRA_BUFER
+	LD	HL,5719h
+	CALL	L5ADD
+	CALL	VUELCA_LOGO
+L58D0:
+	LD	HL,5000h
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	BC,0400h
+	XOR	A
+	CALL	VRAM_RELLENA
+	RET
+	DS 1,RELLENO
+L58E1:
+	LD	B,(IX)
+	INC	IX
+	CALL	L596D
+	LD	(5D56h),DE
+	LD	(5D58h),HL
+	LD	(IY),B
+	INC	IY
+L58F5:
+	PUSH	BC
+	LD	A,(IX+2)
+	LD	DE,(5D56h)
+	CALL	L597F
+	LD	B,H
+	LD	A,(IX)
+	LD	DE,(5D58h)
+	CALL	L597F
+	LD	A,H
+	SUB	B
+	LD	(IY),A
+	LD	A,(IX+2)
+	CALL	L597F
+	LD	B,H
+	LD	A,(IX)
+	LD	DE,(5D56h)
+	CALL	L597F
+	LD	A,H
+	ADD	A,B
+	LD	(IY+4),A
+	LD	A,(IX+1)
+	LD	(IY+2),A
+	LD	A,(IX+1)
+	CALL	L597F
+	LD	B,H
+	LD	A,(IY)
+	LD	DE,(5D58h)
+	CALL	L597F
+	LD	A,H
+	SUB	B
+	LD	C,A
+	LD	A,(IY)
+	LD	(IY),C
+	LD	DE,(5D56h)
+	CALL	L597F
+	LD	B,H
+	LD	A,(IX+1)
+	LD	DE,(5D58h)
+	CALL	L597F
+	LD	A,H
+	ADD	A,B
+	LD	(IY+2),A
+	POP	BC
+	LD	DE,3
+	ADD	IX,DE
+	LD	DE,8
+	ADD	IY,DE
+	DEC	B
+	JP	nz,L58F5
+	RET
+L596D:
+	LD	A,(59C5h)
+	LD	L,A
+	LD	H,5Eh
+	LD	E,(HL)
+	INC	H
+	LD	D,(HL)
+	LD	A,L
+	ADD	A,40h
+	LD	L,A
+	LD	A,(HL)
+	DEC	H
+	LD	L,(HL)
+	LD	H,A
+	RET
+L597F:
+	LD	HL,0
+	LD	(5ADBh),HL
+	OR	A
+	JP	p,L5990
+	LD	C,A
+	LD	(5ADBh),A
+	LD	A,C
+	NEG
+L5990:
+	ADD	A,A
+	JR	nc,L5996
+	LD	L,E
+	LD	H,D
+	ADD	HL,HL
+L5996:
+	ADD	A,A
+	JR	nc,L599A
+	ADD	HL,DE
+L599A:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L599F
+	ADD	HL,DE
+L599F:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L59A4
+	ADD	HL,DE
+L59A4:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L59A9
+	ADD	HL,DE
+L59A9:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L59AE
+	ADD	HL,DE
+L59AE:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L59B3
+	ADD	HL,DE
+L59B3:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L59B8
+	ADD	HL,DE
+L59B8:
+	LD	A,(5ADBh)
+	OR	A
+	RET	p
+	LD	A,L
+	CPL
+	LD	L,A
+	LD	A,H
+	CPL
+	LD	H,A
+	INC	HL
+	RET
+	DS 1,RELLENO
+LOGO_BORRA_BUFER:
+	DI
+	LD	(5AD8h),SP
+	LD	SP,0FF00h
+	LD	HL,0
+	LD	B,8
+L59D3:
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	PUSH	HL
+	DEC	B
+	JP	nz,L59D3
+	LD	SP,0
+	RET
+	DS 2,RELLENO
+L5ADD:
+	LD	B,(HL)
+	INC	HL
+L5ADF:
+	LD	A,(HL)
+	EX	AF,AF'
+	INC	HL
+	LD	A,(HL)
+	INC	HL
+	EXX
+	CALL	L5AEF
+	CALL	c,L5C46
+	EXX
+	DJNZ	L5ADF
+	RET
+L5AEF:
+	LD	(5B1Ch),SP
+	ADD	A,A
+	LD	L,A
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	BC,296Ch
+	ADD	HL,BC
+	LD	SP,HL
+	POP	DE
+	LD	(5B87h),DE
+	POP	DE
+	LD	(5B8Bh),DE
+	EX	AF,AF'
+	ADD	A,A
+	LD	L,A
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,BC
+	LD	SP,HL
+	POP	DE
+	POP	BC
+	LD	(5B85h),DE
+	LD	(5B89h),BC
+	LD	SP,0
+	CALL	L6001
+	LD	(5B8Dh),A
+	LD	DE,(5B87h)
+	LD	BC,(5B8Bh)
+	CALL	L6001
+	LD	(5B8Eh),A
+	LD	HL,5B8Dh
+	OR	(HL)
+	JP	z,L5B73
+	LD	A,(5B8Eh)
+	AND	(HL)
+	RET	nz
+	LD	A,(5B8Eh)
+	OR	A
+	JR	z,L5B4E
+	LD	HL,(5B8Dh)
+	LD	(5B8Fh),HL
+	CALL	L5B91
+	RET	nc
+L5B4E:
+	LD	A,(5B8Dh)
+	OR	A
+	JP	z,L5B73
+	LD	(5B65h),SP
+	LD	SP,5B85h
+	POP	HL
+	POP	DE
+	POP	BC
+	POP	AF
+	PUSH	BC
+	PUSH	AF
+	PUSH	HL
+	PUSH	DE
+	LD	SP,0
+	LD	HL,(5B8Dh)
+	LD	A,L
+	LD	L,H
+	LD	H,A
+	LD	(5B8Fh),HL
+	CALL	L5B91
+L5B73:
+	LD	A,(5B85h)
+	LD	C,A
+	LD	A,(5B87h)
+	LD	L,A
+	LD	A,(5B89h)
+	LD	B,A
+	LD	A,(5B8Bh)
+	LD	H,A
+	SCF
+	RET
+	DS 12,RELLENO
+L5B91:
+	LD	DE,(5B85h)
+	LD	(5C41h),DE
+	LD	BC,(5B89h)
+	LD	(5C43h),BC
+L5BA1:
+	LD	HL,(5B87h)
+	ADD	HL,DE
+	SRL	H
+	RR	L
+	EX	DE,HL
+	LD	HL,(5B8Bh)
+	ADD	HL,BC
+	SRL	H
+	RR	L
+	LD	C,L
+	LD	B,H
+L5BB4:
+	CALL	L6001
+	LD	(5C45h),A
+	LD	HL,5B90h
+	AND	(HL)
+	JR	nz,L5BEB
+	LD	A,(5C41h)
+	CP	E
+	JR	nz,L5BCD
+	LD	A,(5C43h)
+	CP	C
+	JP	z,L5C33
+L5BCD:
+	LD	A,(5B87h)
+	CP	E
+	JR	nz,L5BDA
+	LD	A,(5B8Bh)
+	CP	C
+	JP	z,L5C33
+L5BDA:
+	LD	(5C41h),DE
+	LD	(5C43h),BC
+	LD	A,(5C45h)
+	LD	(5B8Fh),A
+	JP	L5BA1
+L5BEB:
+	LD	A,(5B87h)
+	CP	E
+	JR	nz,L5BF8
+	LD	A,(5B8Bh)
+	CP	C
+	JP	z,L5C33
+L5BF8:
+	LD	A,(5C41h)
+	CP	E
+	JR	nz,L5C04
+	LD	A,(5C43h)
+	CP	C
+	JR	z,L5C33
+L5C04:
+	LD	A,(5B8Fh)
+	OR	A
+	JR	z,L5C0F
+	LD	HL,5B90h
+	AND	(HL)
+	RET	nz
+L5C0F:
+	LD	(5B87h),DE
+	LD	(5B8Bh),BC
+	LD	A,(5C45h)
+	LD	(5B90h),A
+	LD	HL,(5C41h)
+	ADD	HL,DE
+	SRL	H
+	RR	L
+	EX	DE,HL
+	LD	HL,(5C43h)
+	ADD	HL,BC
+	SRL	H
+	RR	L
+	LD	C,L
+	LD	B,H
+	JP	L5BB4
+L5C33:
+	LD	HL,(5C41h)
+	LD	(5B87h),HL
+	LD	HL,(5C43h)
+	LD	(5B8Bh),HL
+	SCF
+	RET
+	DS 5,RELLENO
+L5C46:
+	LD	A,B
+	SUB	H
+	JR	nc,L5C50
+	NEG
+	LD	H,B
+	LD	B,L
+	LD	L,C
+	LD	C,B
+L5C50:
+	LD	B,A
+	PUSH	HL
+	CALL	L5D27
+	EX	(SP),HL
+	LD	A,L
+	SUB	C
+	EXX
+	LD	DE,022Dh
+	JP	z,L5CD6
+	JR	nc,L5C66
+	LD	DE,0A2Ch
+	NEG
+L5C66:
+	EXX
+	LD	E,A
+	OR	B
+	JP	z,L5CD4
+	LD	A,B
+	CP	E
+	JP	nc,L5CA7
+	EXX
+	LD	A,D
+	LD	(5C9Ah),A
+	LD	A,E
+	LD	(5C9Eh),A
+	EXX
+	POP	HL
+	LD	A,B
+	OR	A
+	JP	z,L5CFB
+	LD	C,B
+	LD	B,E
+	RRA
+L5C84:
+	ADD	A,C
+	JR	c,L5C8A
+	CP	E
+	JR	c,L5C99
+L5C8A:
+	SUB	E
+	INC	H
+	INC	H
+	JP	nz,L5C98
+	EX	AF,AF'
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	H,0F0h
+	EX	AF,AF'
+L5C98:
+	DEC	H
+L5C99:
+	RRC	D
+	JP	nc,L5C9F
+	INC	L
+L5C9F:
+	EX	AF,AF'
+	LD	A,(HL)
+	OR	D
+	LD	(HL),A
+	EX	AF,AF'
+	DJNZ	L5C84
+	RET
+L5CA7:
+	EXX
+	LD	A,D
+	LD	(5CBBh),A
+	LD	A,E
+	LD	(5CBFh),A
+	EXX
+	POP	HL
+	LD	C,B
+	LD	A,B
+	RRA
+L5CB5:
+	ADD	A,E
+	CP	C
+	JR	c,L5CC0
+	SUB	C
+	RRC	D
+	JP	nc,L5CC0
+	INC	L
+L5CC0:
+	EX	AF,AF'
+	INC	H
+	INC	H
+	JP	nz,L5CCC
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	H,0F0h
+L5CCC:
+	DEC	H
+	LD	A,(HL)
+	OR	D
+	LD	(HL),A
+	EX	AF,AF'
+	DJNZ	L5CB5
+	RET
+L5CD4:
+	POP	HL
+	RET
+L5CD6:
+	EXX
+	LD	A,L
+	AND	7
+	XOR	7
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	OR	0C6h
+	LD	(5CF7h),A
+	LD	A,B
+	OR	A
+	POP	HL
+	RET	z
+	LD	C,20h
+	LD	E,0EFh
+L5CEC:
+	INC	H
+	INC	H
+	JP	nz,L5CF5
+	LD	A,L
+	ADD	A,C
+	LD	L,A
+	LD	H,E
+L5CF5:
+	DEC	H
+	SET	0,(HL)
+	DJNZ	L5CEC
+	RET
+L5CFB:
+	EXX
+	LD	A,D
+	LD	(5D0Ch),A
+	LD	A,E
+	LD	(5D11h),A
+	LD	(5D19h),A
+	EXX
+	LD	B,E
+	LD	A,(HL)
+L5D0A:
+	OR	D
+	RRC	D
+	JP	nc,L5D23
+	LD	(HL),A
+	INC	L
+	LD	A,B
+	CP	9
+	JR	c,L5D22
+L5D17:
+	LD	(HL),0FFh
+	INC	L
+	LD	A,B
+	SUB	8
+	LD	B,A
+	CP	9
+	JR	nc,L5D17
+L5D22:
+	LD	A,(HL)
+L5D23:
+	DJNZ	L5D0A
+	LD	(HL),A
+	RET
+L5D27:
+	LD	A,H
+	AND	15
+	ADD	A,0EFh
+	LD	D,A
+	LD	A,H
+	AND	70h
+	ADD	A,A
+	LD	E,A
+	LD	A,L
+	RRCA
+	RRCA
+	RRCA
+	AND	1Fh
+	OR	E
+	LD	E,A
+	LD	A,L
+	LD	(5D55h),A
+	AND	7
+	ADD	A,4Dh
+	LD	L,A
+	ADC	A,5Dh
+	SUB	L
+	LD	H,A
+	LD	H,(HL)
+	EX	DE,HL
+	LD	A,(HL)
+	OR	D
+	LD	(HL),A
+	RET
+	DS 13,RELLENO
+L5D5A:
+	LD	IY,296Bh
+	LD	B,(IY)
+	INC	IY
+	LD	A,(5802h)
+	OR	A
+	JR	nz,L5D6A
+	INC	A
+L5D6A:
+	NEG
+	LD	E,A
+L5D6D:
+	PUSH	BC
+	LD	A,(IY)
+	CALL	L601D
+	LD	A,H
+	RL	L
+	ADC	A,A
+	LD	C,A
+	SBC	A,A
+	LD	B,A
+	LD	HL,(55B6h)
+	ADD	HL,BC
+	LD	(IY),L
+	LD	(IY+1),H
+	LD	A,(IY+2)
+	CALL	L601D
+	LD	A,H
+	RL	L
+	ADC	A,A
+	LD	C,A
+	SBC	A,A
+	LD	B,A
+	LD	HL,(55B8h)
+	ADD	HL,BC
+	LD	(IY+2),L
+	LD	(IY+3),H
+	LD	A,(IY+4)
+	ADD	A,A
+	LD	C,A
+	SBC	A,A
+	LD	B,A
+	LD	HL,(55BAh)
+	ADD	HL,BC
+	LD	(IY+4),L
+	LD	(IY+5),H
+	LD	BC,8
+	ADD	IY,BC
+	POP	BC
+	DJNZ	L5D6D
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 10,RELLENO
+L6000:
+	RET
+L6001:
+	XOR	A
+	LD	HL,0FFh
+	SBC	HL,DE
+	CCF
+	ADC	A,A
+	LD	HL,01FFh
+	SBC	HL,DE
+	ADC	A,A
+	LD	HL,0FFh
+	SBC	HL,BC
+	CCF
+	ADC	A,A
+	LD	HL,017Fh
+	SBC	HL,BC
+	ADC	A,A
+	RET
+L601D:
+	LD	HL,0
+	LD	(5ADBh),A
+	LD	H,A
+	OR	A
+	JP	p,L6030
+	NEG
+	LD	H,A
+	LD	A,0FFh
+	LD	(5ADBh),A
+L6030:
+	LD	D,L
+	ADD	HL,HL
+	JR	nc,L6035
+	ADD	HL,DE
+L6035:
+	ADD	HL,HL
+	JR	nc,L6039
+	ADD	HL,DE
+L6039:
+	ADD	HL,HL
+	JR	nc,L603D
+	ADD	HL,DE
+L603D:
+	ADD	HL,HL
+	JR	nc,L6041
+	ADD	HL,DE
+L6041:
+	ADD	HL,HL
+	JR	nc,L6045
+	ADD	HL,DE
+L6045:
+	ADD	HL,HL
+	JR	nc,L6049
+	ADD	HL,DE
+L6049:
+	ADD	HL,HL
+	JR	nc,L604D
+	ADD	HL,DE
+L604D:
+	ADD	HL,HL
+	JR	nc,L6051
+	ADD	HL,DE
+L6051:
+	LD	A,(5ADBh)
+	OR	A
+	RET	p
+	LD	A,L
+	CPL
+	LD	L,A
+	LD	A,H
+	CPL
+	LD	H,A
+	INC	HL
+	RET
+PREPARA_CARAS:
+	LD	B,11h
+	LD	HL,0EA00h
+	XOR	A
+L6064:
+	CALL	L6074
+	LD	DE,6
+	ADD	HL,DE
+	INC	A
+	CP	12
+	JR	nz,L6071
+	XOR	A
+L6071:
+	DJNZ	L6064
+	RET
+L6074:
+	PUSH	AF
+	PUSH	BC
+	PUSH	HL
+	EX	DE,HL
+	ADD	A,A
+	ADD	A,0D6h
+	LD	L,A
+	ADC	A,34h
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	B,34h
+L6086:
+	PUSH	BC
+	CALL	LBD1A
+	LD	A,60h
+	ADD	A,E
+	LD	E,A
+	ADC	A,D
+	SUB	E
+	LD	D,A
+	POP	BC
+	DJNZ	L6086
+	POP	HL
+	POP	BC
+	POP	AF
+	RET
+VRAM_DESTINO:
+	DS 2,RELLENO
+VUELCA_LOGO:
+	LD	B,8
+	LD	HL,0200h
+	LD	(VRAM_DESTINO),HL
+	LD	HL,MUSICA_PRESENTACION
+	CALL	L60A9
+	RET
+L60A9:
+	PUSH	BC
+	PUSH	HL
+	EX	DE,HL
+	LD	HL,(VRAM_DESTINO)
+	CALL	VRAM_ESCRIBE_EN
+	LD	A,20h
+L60B4:
+	EX	AF,AF'
+	LD	H,D
+	LD	L,E
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OR	(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	INC	DE
+	EX	AF,AF'
+	DEC	A
+	JP	nz,L60B4
+	LD	HL,(VRAM_DESTINO)
+	INC	H
+	LD	(VRAM_DESTINO),HL
+	POP	HL
+	LD	BC,20h
+	ADD	HL,BC
+	POP	BC
+	DEC	B
+	JP	nz,L60A9
+	RET
+
+;----------------------------------------------------------------------
+; ARRANQUE: Pila en 6182h, tabla de colores Spectrum->MSX en 0400h, música de
+; presentación y bucle principal.
+;----------------------------------------------------------------------
+ARRANQUE:
+	DI
+	LD	SP,INT_VACIA
+	CALL	HAZ_TABLA_ATRIB
+	CALL	MUSICA_PRESENTACION
+	JP	BUCLE_PRINCIPAL
+
+;----------------------------------------------------------------------
+; HAZ_TABLA_ATRIB: Rellena 0400h-04FFh: para cada atributo de Spectrum (tinta, papel, brillo)
+; el byte de color del VDP equivalente (llama a ATRIB_A_COLOR 256 veces).
+;----------------------------------------------------------------------
+HAZ_TABLA_ATRIB:
+	LD	HL,0400h
+	XOR	A
+	LD	B,A
+L6111:
+	PUSH	AF
+	PUSH	BC
+	CALL	ATRIB_A_COLOR
+	LD	(HL),A
+	INC	HL
+	POP	BC
+	POP	AF
+	INC	A
+	DJNZ	L6111
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 4,RELLENO
+
+;----------------------------------------------------------------------
+; INT_VACIA: Rutina de interrupción durante el juego: solo lee el estado del VDP (99h)
+; para bajar la petición y vuelve. No hay música durante la carrera.
+;----------------------------------------------------------------------
+INT_VACIA:
+	PUSH	AF
+	IN	A,(99h)	; VDP: control
+	POP	AF
+	EI
+	RETI
+
+;----------------------------------------------------------------------
+; VRAM_RELLENA: Rellena BC bytes de VRAM desde HL con el valor A.
+;----------------------------------------------------------------------
+VRAM_RELLENA:
+	PUSH	AF
+	CALL	VRAM_ESCRIBE_EN
+	POP	AF
+VRAM_RELLENA_SIGUE:
+	OUT	(98h),A	; VDP: datos
+	EX	AF,AF'
+	DEC	BC
+	LD	A,B
+	OR	C
+	RET	z
+	EX	AF,AF'
+	JP	VRAM_RELLENA_SIGUE
+
+;----------------------------------------------------------------------
+; VRAM_COPIA: Copia BC bytes de RAM (HL) a VRAM (DE).
+;----------------------------------------------------------------------
+VRAM_COPIA:
+	DI
+	EX	DE,HL
+	CALL	VRAM_ESCRIBE_EN
+	EX	DE,HL
+L619F:
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JP	nz,L619F
+	RET
+
+;----------------------------------------------------------------------
+; VRAM_LEE: Lee BC bytes de VRAM 0800h a RAM (DE).
+;----------------------------------------------------------------------
+VRAM_LEE:
+	DI
+	EX	DE,HL
+	LD	HL,0800h
+	CALL	VRAM_LEE_EN
+	EX	DE,HL
+L61B3:
+	IN	A,(98h)	; VDP: datos
+	LD	(HL),A
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JP	nz,L61B3
+	RET
+
+;----------------------------------------------------------------------
+; VRAM_ESCRIBE_EN: Prepara el VDP para escribir en la dirección HL. Los dos EX (SP),HL son
+; solo una espera (38 ciclos) para el TMS9918.
+;----------------------------------------------------------------------
+VRAM_ESCRIBE_EN:
+	DI
+	LD	A,L
+	OUT	(99h),A	; VDP: control
+	LD	A,H
+	AND	3Fh
+	OR	40h
+	OUT	(99h),A	; VDP: control
+	EX	(SP),HL
+	EX	(SP),HL
+	RET
+
+;----------------------------------------------------------------------
+; VRAM_LEE_EN: Prepara el VDP para leer en la dirección HL (con la misma espera).
+;----------------------------------------------------------------------
+VRAM_LEE_EN:
+	DI
+	LD	A,L
+	OUT	(99h),A	; VDP: control
+	LD	A,H
+	AND	3Fh
+	OUT	(99h),A	; VDP: control
+	EX	(SP),HL
+	EX	(SP),HL
+	RET
+
+;----------------------------------------------------------------------
+; PON_BORDE: Color del borde (registro 7 del VDP) = A.
+;----------------------------------------------------------------------
+PON_BORDE:
+	OUT	(99h),A	; VDP: control
+	LD	A,87h
+	OUT	(99h),A	; VDP: control
+	RET
+
+;----------------------------------------------------------------------
+; SONIDO_2: Pide el efecto de sonido 2.
+;----------------------------------------------------------------------
+SONIDO_2:
+	LD	A,2
+	LD	(EFECTO_PEDIDO),A
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 15,RELLENO
+
+;----------------------------------------------------------------------
+; LEE_JOYSTICK: Joystick del puerto A por el PSG (registro 14). OJO: pone a 1 los bits 6
+; y 7 del registro 7, es decir, el puerto A como SALIDA, contra la norma MSX.
+;----------------------------------------------------------------------
+LEE_JOYSTICK:
+	LD	A,7
+	OUT	(0A0h),A	; PSG: registro
+	IN	A,(0A2h)	; PSG: lee
+	OR	0C0h
+	PUSH	AF
+	LD	A,7
+	OUT	(0A0h),A	; PSG: registro
+	POP	AF
+	OUT	(0A1h),A	; PSG: escribe
+	LD	A,14
+	OUT	(0A0h),A	; PSG: registro
+	IN	A,(0A2h)	; PSG: lee
+	LD	E,1
+	RRA
+	JR	c,L9881
+	SET	1,E
+L9881:
+	RRA
+	JR	c,L9886
+	SET	2,E
+L9886:
+	RRA
+	JR	c,L988B
+	SET	4,E
+L988B:
+	RRA
+	JR	c,L9890
+	SET	3,E
+L9890:
+	RRA
+	RET	nc
+	RES	0,E
+	RET
+
+;----------------------------------------------------------------------
+; ATRIB_A_COLOR: Traduce un atributo de Spectrum (FBPPPIII) al byte de color del VDP
+; (tinta en el nibble alto, papel en el bajo). Tablas en 98C4h (normal) y
+; 98CCh (brillo).
+;----------------------------------------------------------------------
+ATRIB_A_COLOR:
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	PUSH	AF
+	LD	HL,98C4h
+	BIT	6,A
+	JR	z,L98A3
+	LD	HL,98CCh
+L98A3:
+	PUSH	HL
+	AND	7
+	LD	E,A
+	LD	D,0
+	ADD	HL,DE
+	LD	A,(HL)
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	LD	C,A
+	POP	HL
+	POP	AF
+	AND	38h
+	SRA	A
+	SRA	A
+	SRA	A
+	LD	E,A
+	LD	D,0
+	ADD	HL,DE
+	LD	A,(HL)
+	OR	C
+	POP	BC
+	POP	DE
+	POP	HL
+	RET
+	DS 16,RELLENO
+
+;----------------------------------------------------------------------
+; DIR_PATRON: Dirección de pantalla de Spectrum (DE) -> dirección de patrones del VDP.
+;----------------------------------------------------------------------
+DIR_PATRON:
+	PUSH	AF
+	LD	A,D
+	AND	7
+	LD	(98EEh),A
+	LD	A,D
+	AND	18h
+	LD	D,A
+	LD	A,E
+	RLCA
+	RLCA
+	RLCA
+	AND	7
+	OR	D
+	LD	D,A
+	LD	A,E
+	AND	1Fh
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,0
+	LD	E,A
+	POP	AF
+	RET
+
+;----------------------------------------------------------------------
+; DIR_COLOR: Dirección de atributos de Spectrum (DE) -> dirección de colores del VDP.
+;----------------------------------------------------------------------
+DIR_COLOR:
+	PUSH	AF
+	PUSH	HL
+	EX	DE,HL
+	LD	DE,0A800h
+	ADD	HL,DE
+	PUSH	HL
+	SRL	H
+	RR	L
+	SRL	H
+	RR	L
+	SRL	H
+	RR	L
+	SRL	H
+	RR	L
+	SRL	H
+	RR	L
+	LD	H,L
+	LD	L,0
+	EX	DE,HL
+	POP	HL
+	LD	H,0
+	LD	A,L
+	AND	1Fh
+	LD	L,A
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,DE
+	LD	DE,2000h
+	ADD	HL,DE
+	EX	DE,HL
+	POP	HL
+	POP	AF
+	RET
+
+;----------------------------------------------------------------------
+; LEE_TECLA: Barre las filas 0-8 del teclado y devuelve en A el código ASCII de la
+; primera tecla pulsada (tabla en 9951h), o 0.
+;----------------------------------------------------------------------
+LEE_TECLA:
+	PUSH	HL
+	PUSH	BC
+	LD	DE,0F000h
+L992A:
+	LD	A,D
+	OUT	(0AAh),A	; PPI: fila de teclado / motor cinta
+	IN	A,(0A9h)	; PPI: teclado (columnas)
+	LD	B,8
+L9931:
+	RRCA
+	JR	nc,L9941
+	INC	E
+	DJNZ	L9931
+	INC	D
+	LD	A,0F9h
+	CP	D
+	JR	nz,L992A
+	XOR	A
+	POP	BC
+	POP	HL
+	RET
+L9941:
+	LD	A,1
+L9943:
+	RRCA
+	DJNZ	L9943
+	LD	C,E
+	LD	E,A
+	LD	HL,9951h
+	ADD	HL,BC
+	LD	A,(HL)
+	OR	A
+	POP	BC
+	POP	HL
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 8,RELLENO
+
+;----------------------------------------------------------------------
+; PINTA_LETRA: Escribe la letra A en la posición de 99A5h (patrones y color 99CCh).
+;----------------------------------------------------------------------
+PINTA_LETRA:
+	EXX
+	LD	L,A
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	A,H
+	ADD	A,4
+	LD	H,A
+	LD	DE,0
+	LD	A,E
+	INC	A
+	LD	(99A5h),A
+	PUSH	HL
+	LD	HL,8000h
+	AND	A
+	SBC	HL,DE
+	POP	HL
+	JR	c,L99D8
+	CALL	DIR_PATRON
+	PUSH	DE
+	LD	BC,8
+	CALL	VRAM_COPIA
+	POP	HL
+	LD	A,(99E2h)
+	AND	A
+	JR	z,L99D6
+	LD	BC,2000h
+	ADD	HL,BC
+	LD	A,0
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	CALL	VRAM_RELLENA
+L99D6:
+	EXX
+	RET
+L99D8:
+	LD	B,8
+L99DA:
+	LD	A,(HL)
+	LD	(DE),A
+	INC	D
+	INC	HL
+	DJNZ	L99DA
+	EXX
+	RET
+	DS 1,RELLENO
+ESPEJO_COCHE:
+	LD	A,(0E432h)
+	DEC	A
+	LD	HL,0D84Ch
+	LD	BC,0AD8h
+	JR	z,L99F5
+	LD	HL,0D256h
+	LD	BC,05F6h
+L99F5:
+	LD	IX,88D8h
+	CALL	INTERCAMBIA
+	RET
+MOTOR_ENCENDIDO:
+	LD	A,(PSG_R7)
+	AND	0FAh
+	LD	(PSG_R7),A
+	LD	E,A
+	LD	A,7
+	CALL	PSG_ESCRIBE
+	LD	A,8
+	LD	E,13
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,15
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,13
+	CALL	PSG_ESCRIBE
+	RET
+SILENCIO:
+	LD	A,(PSG_R7)
+	OR	7
+	LD	(PSG_R7),A
+	LD	E,A
+	LD	A,7
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,0
+	CALL	PSG_ESCRIBE
+	INC	A
+	CALL	PSG_ESCRIBE
+	INC	A
+	CALL	PSG_ESCRIBE
+	RET
+SILENCIO_TODO:
+	LD	A,0BFh
+	LD	(PSG_R7),A
+	LD	E,A
+	LD	A,7
+	CALL	PSG_ESCRIBE
+	RET
+
+;----------------------------------------------------------------------
+; PARTIDA: Las 5 etapas de un circuito (y la etapa extra).
+;----------------------------------------------------------------------
+PARTIDA:
+	CALL	PUNTOS_A_CERO
+L9A4B:
+	LD	HL,CREDITOS
+	DEC	(HL)
+L9A4F:
+	CALL	SILENCIO
+	CALL	CARRERA
+	CALL	SILENCIO
+	CALL	SILENCIO_TODO
+	LD	A,(ETAPA)
+	ADD	A,25h
+	LD	H,0E4h
+	LD	L,A
+	LD	A,(PUESTO)
+	LD	(HL),A
+	CP	3
+	JR	nc,L9A8B
+	LD	A,(ETAPA)
+	INC	A
+	LD	(ETAPA),A
+	CP	5
+	JR	c,L9A4F
+	JR	z,L9A7D
+	CALL	ESPEJO_COCHE
+	JR	L9A95
+L9A7D:
+	LD	HL,0E424h
+	LD	B,6
+	XOR	A
+L9A83:
+	OR	(HL)
+	JR	nz,L9A95
+	INC	L
+	DJNZ	L9A83
+	JR	L9A4F
+L9A8B:
+	CALL	SUMA_PUNTOS_ETAPA
+	CALL	CONTINUAR
+	JR	c,L9A4B
+	JR	L9A9B
+L9A95:
+	CALL	PODIO
+	CALL	SUMA_PUNTOS_ETAPA
+L9A9B:
+	CALL	RECORDS
+	CALL	nc,GAME_OVER
+	RET
+
+;----------------------------------------------------------------------
+; CARRERA: Una carrera: prepara y entra en el bucle de imágenes.
+;----------------------------------------------------------------------
+CARRERA:
+	CALL	PANTALLA_ETAPA
+	LD	A,(ETAPA)
+	CP	5
+	JR	c,L9AB8
+	LD	A,(CIRCUITO)
+	AND	1
+	INC	A
+	LD	(0E432h),A
+	CALL	ESPEJO_COCHE
+L9AB8:
+	XOR	A
+	LD	(0E44Ah),A
+	LD	(0E44Bh),A
+	LD	(0E44Ch),A
+	LD	(0E521h),A
+	LD	(0E523h),A
+	LD	A,2
+	LD	(0E522h),A
+	CALL	PREPARA_CARRERA
+	CALL	MOTOR_ENCENDIDO
+
+;----------------------------------------------------------------------
+; BUCLE_CARRERA: Bucle de una imagen: espera a la interrupción (HALT) y hace todo.
+; En un HB-20P da ~6,6 imágenes por segundo.
+;----------------------------------------------------------------------
+BUCLE_CARRERA:
+	EI
+	HALT
+	DI
+	CALL	AVANZA_PISTA
+	CALL	CALCULA_BORDES
+	CALL	VUELCA_BUFER
+	CALL	DESPLAZA_HORIZONTE
+	CALL	EFECTOS_SONIDO
+	CALL	NADA
+	CALL	CUENTA_TIEMPO
+	CALL	MUEVE_RIVALES
+	CALL	PINTA_SUELO
+	CALL	PINTA_PISTA
+	CALL	EFECTOS_SONIDO
+	CALL	PINTA_RIVALES
+	CALL	EFECTOS_SONIDO
+	CALL	PINTA_JUGADOR
+	CALL	MUEVE_DECORADO
+	LD	A,(0E433h)
+	OR	A
+	CALL	CHOQUE
+	LD	A,(0E44Ah)
+	CP	3
+	CALL	nz,SEMAFORO
+	LD	A,(0E6E3h)
+	OR	A
+	CALL	z,ORDENA_CARRERA
+	CALL	PINTA_MARCADOR
+	CALL	MIRA_CHOQUES
+	CALL	PINTA_VUELTA
+	CALL	PINTA_VELOCIDAD
+	LD	A,(0E44Ch)
+	OR	A
+	CALL	nz,CARTELES
+	LD	HL,0E6B8h
+	LD	A,(HL)
+	OR	A
+	CALL	nz,MENSAJES_CARRERA
+	CALL	CUENTA_FIN
+	CALL	SALTO
+	LD	A,(0E6E3h)
+	OR	A
+	JR	z,L9B53
+	LD	A,(VELOCIDAD)
+	LD	HL,0E6E4h
+	SUB	(HL)
+	LD	(VELOCIDAD),A
+	JR	nc,L9B5A
+	XOR	A
+	LD	(VELOCIDAD),A
+	JP	L9B5A
+L9B53:
+	LD	A,(0E6CAh)
+	CP	7
+	JR	c,L9B61
+L9B5A:
+	LD	A,(0E6E3h)
+	OR	A
+	CALL	z,CONTROL_JUGADOR
+L9B61:
+	LD	A,(0E6E5h)
+	OR	A
+	JP	z,BUCLE_CARRERA
+	CALL	SILENCIO
+	CALL	SILENCIO_TODO
+	RET
+
+;----------------------------------------------------------------------
+; AVANZA_PISTA: Avanza por el circuito según la velocidad y calcula la curva.
+;----------------------------------------------------------------------
+AVANZA_PISTA:
+	CALL	PROYECTA_TRAMOS
+	LD	HL,(0E6F2h)
+	LD	DE,(0E466h)
+	OR	A
+	SBC	HL,DE
+	LD	A,L
+	ADD	A,80h
+	LD	(0E46Fh),A
+	LD	(9BF1h),A
+	LD	DE,3Ch
+	ADD	HL,DE
+	LD	(9BB9h),HL
+	EXX
+	LD	HL,0E470h
+	EXX
+	LD	A,(0E6F0h)
+	ADD	A,20h
+	DS 2,RELLENO	; LD	IYL,A
+	DS 3,RELLENO	; LD	IYH,0EAh
+	LD	A,(0E6EFh)
+	AND	0E0h
+	LD	C,A
+	DS 2,RELLENO	; LD	IXL,A
+	DS 3,RELLENO	; LD	IXH,0E8h
+	LD	B,15h
+L9BA8:
+	LD	E,(IY)
+	LD	HL,(9BB9h)
+	DS 2,RELLENO	; INC	IYL
+	LD	A,E
+	RLA
+	SBC	A,A
+	LD	D,A
+	ADD	HL,DE
+	LD	(9BB9h),HL
+	LD	DE,3Ch
+	LD	A,(IX)
+	LD	HL,0
+	ADD	A,A
+	JR	nc,L9BC7
+	LD	L,E
+	LD	H,D
+	ADD	HL,HL
+L9BC7:
+	ADD	A,A
+	JR	nc,L9BCB
+	ADD	HL,DE
+L9BCB:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9BD0
+	ADD	HL,DE
+L9BD0:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9BD5
+	ADD	HL,DE
+L9BD5:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9BDA
+	ADD	HL,DE
+L9BDA:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9BDF
+	ADD	HL,DE
+L9BDF:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9BE4
+	ADD	HL,DE
+L9BE4:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9BE9
+	ADD	HL,DE
+L9BE9:
+	RL	L
+	LD	A,H
+	ADC	A,0
+	NEG
+	ADD	A,80h
+	EXX
+	LD	(HL),A
+	INC	L
+	EXX
+	DS 2,RELLENO	; INC	IXL
+	DJNZ	L9BA8
+	EXX
+	LD	(HL),0A0h
+	EXX
+	RET
+
+;----------------------------------------------------------------------
+; PROYECTA_TRAMOS: Proyección en perspectiva de los tramos de la pista que se ven.
+;----------------------------------------------------------------------
+PROYECTA_TRAMOS:
+	LD	A,(0E6EFh)
+	AND	0E0h
+	DS 2,RELLENO	; LD	IXL,A
+	DS 3,RELLENO	; LD	IXH,0E8h
+	EXX
+	LD	HL,0E681h
+	EXX
+	LD	B,15h
+	LD	HL,(0E6F2h)
+	LD	DE,4Ch
+	OR	A
+	SBC	HL,DE
+	JP	nc,L9C84
+	ADD	HL,DE
+	LD	A,L
+	CPL
+	LD	L,A
+	LD	A,H
+	CPL
+	LD	H,A
+	INC	HL
+	LD	DE,3Ch
+	ADD	HL,DE
+	LD	(9C2Ch),HL
+L9C2B:
+	LD	DE,3Ch
+	LD	A,(IX)
+	LD	HL,0
+	ADD	A,A
+	JR	nc,L9C3A
+	LD	L,E
+	LD	H,D
+	ADD	HL,HL
+L9C3A:
+	ADD	A,A
+	JR	nc,L9C3E
+	ADD	HL,DE
+L9C3E:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9C43
+	ADD	HL,DE
+L9C43:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9C48
+	ADD	HL,DE
+L9C48:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9C4D
+	ADD	HL,DE
+L9C4D:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9C52
+	ADD	HL,DE
+L9C52:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9C57
+	ADD	HL,DE
+L9C57:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9C5C
+	ADD	HL,DE
+L9C5C:
+	RL	L
+	LD	A,H
+	ADC	A,0
+	NEG
+	ADD	A,80h
+	EXX
+	LD	(HL),A
+	INC	L
+	EXX
+	DS 2,RELLENO	; INC	IXL
+	DJNZ	L9C2B
+	EXX
+	LD	(HL),0A0h
+	DEC	L
+	LD	A,(HL)
+	ADD	A,3
+	AND	0F8h
+	LD	C,A
+	CP	81h
+	JR	nc,L9C82
+	LD	HL,0E43Eh
+	SUB	(HL)
+	LD	(HL),C
+	INC	L
+	LD	(HL),A
+L9C82:
+	EXX
+	RET
+L9C84:
+	LD	HL,0E681h
+	LD	DE,0E682h
+	LD	BC,14h
+	LD	(HL),90h
+	LDIR
+	LD	(HL),0F0h
+	RET
+CALCULA_BORDES:
+	LD	A,(0E6EFh)
+	AND	0E0h
+	LD	C,A
+	DS 2,RELLENO	; LD	IYL,A
+	DS 3,RELLENO	; LD	IYH,0E9h
+	LD	A,(0E6F0h)
+	DS 2,RELLENO	; LD	IXL,A
+	DS 3,RELLENO	; LD	IXH,0EAh
+	LD	A,(IX)
+	CALL	LA271
+	ADD	A,80h
+	LD	L,A
+	LD	H,0
+	LD	(9CCEh),HL
+	PUSH	HL
+	LD	DE,0E486h
+	LD	B,16h
+	EXX
+	POP	HL
+	LD	DE,(0E43Ch)
+	JR	L9CD4
+L9CC3:
+	LD	A,(IX)
+	DS 2,RELLENO	; INC	IXL
+	EXX
+	ADD	A,A
+	LD	C,A
+	SBC	A,A
+	LD	B,A
+	LD	HL,0
+	ADD	HL,BC
+	LD	(9CCEh),HL
+L9CD4:
+	OR	A
+	SBC	HL,DE
+	LD	C,L
+	LD	B,H
+	LD	HL,0
+	LD	A,(IY)
+	DS 2,RELLENO	; INC	IYL
+	ADD	A,A
+	JR	nc,L9CE7
+	LD	H,B
+	LD	L,C
+	ADD	HL,HL
+L9CE7:
+	ADD	A,A
+	JR	nc,L9CEB
+	ADD	HL,BC
+L9CEB:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9CF0
+	ADD	HL,BC
+L9CF0:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9CF5
+	ADD	HL,BC
+L9CF5:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9CFA
+	ADD	HL,BC
+L9CFA:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9CFF
+	ADD	HL,BC
+L9CFF:
+	ADD	HL,HL
+	ADD	A,A
+	JR	nc,L9D04
+	ADD	HL,BC
+L9D04:
+	LD	A,H
+	RL	L
+	ADC	A,0
+	LD	H,A
+	RLA
+	SBC	A,A
+	LD	L,H
+	LD	H,A
+	LD	A,L
+	ADD	HL,DE
+	EX	DE,HL
+	EXX
+	LD	(DE),A
+	INC	E
+	DJNZ	L9CC3
+	LD	A,(0E446h)
+	INC	A
+	JR	nz,L9D41
+	LD	A,(9DF1h)
+	LD	E,A
+	RLA
+	SBC	A,A
+	LD	D,A
+	LD	HL,(0E43Ch)
+	ADD	HL,DE
+	LD	A,H
+	CP	2
+	JP	c,L9D30
+	LD	HL,01DFh
+L9D30:
+	PUSH	HL
+	LD	DE,01E0h
+	OR	A
+	SBC	HL,DE
+	POP	DE
+	JR	c,L9D3D
+	LD	DE,0
+L9D3D:
+	LD	(0E43Ch),DE
+L9D41:
+	LD	DE,(0E43Ch)
+	PUSH	DE
+	EXX
+	LD	HL,MUSICA_PRESENTACION
+	CALL	BORDES_A_TABLA
+	LD	A,(0E6EFh)
+	AND	0E0h
+	LD	L,A
+	LD	H,3
+	LD	DE,0E486h
+	LD	B,16h
+L9D5A:
+	LD	A,(DE)
+	ADD	A,(HL)
+	LD	(DE),A
+	INC	E
+	INC	L
+	DJNZ	L9D5A
+	POP	HL
+	LD	DE,0FF00h
+	ADD	HL,DE
+	EX	DE,HL
+	EXX
+	LD	HL,0ED00h
+BORDES_A_TABLA:
+	LD	IY,0E46Fh
+	LD	B,15h
+	LD	(9DCBh),SP
+	LD	SP,HL
+	EX	DE,HL
+	DEC	D
+	DEC	D
+L9D79:
+	LD	HL,0FFFEh
+	ADD	HL,SP
+	EX	DE,HL
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	INC	L
+	EX	DE,HL
+	EXX
+	LD	A,(IY)
+	DS 2,RELLENO	; INC	IYL
+	SUB	(IY)
+	LD	B,1
+	JR	z,L9DE5
+	JP	p,L9D95
+	NEG
+L9D95:
+	LD	C,A
+	LD	B,A
+	LD	L,(IY+16h)
+	BIT	7,L
+	JR	z,L9DAA
+	LD	A,L
+	NEG
+	LD	L,A
+	LD	A,B
+	CP	L
+	LD	A,1Bh
+	JR	c,L9DCE
+	JR	L9DAF
+L9DAA:
+	CP	L
+	LD	A,13h
+	JR	c,L9DCE
+L9DAF:
+	LD	(9DB9h),A
+	LD	A,B
+	RRA
+L9DB4:
+	ADD	A,L
+	CP	C
+	JR	c,L9DBA
+	SUB	C
+	INC	DE
+L9DBA:
+	PUSH	DE
+	DJNZ	L9DB4
+	EXX
+	DJNZ	L9D79
+L9DC0:
+	LD	HL,0
+	ADD	HL,SP
+	EX	DE,HL
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	DEC	L
+	EX	DE,HL
+	LD	SP,0
+	RET
+L9DCE:
+	LD	(L9DD4),A
+	LD	A,B
+	SRL	A
+L9DD4:
+	INC	DE
+	ADD	A,C
+	JR	c,L9DDB
+	CP	L
+	JR	c,L9DD4
+L9DDB:
+	SUB	L
+	PUSH	DE
+	DJNZ	L9DD4
+	EXX
+	DJNZ	L9D79
+	JP	L9DC0
+L9DE5:
+	LD	L,(IY+16h)
+	LD	A,L
+	RLA
+	SBC	A,A
+	LD	H,A
+	ADD	HL,DE
+	EX	DE,HL
+	JP	L9DBA
+	DS 3,RELLENO
+FILA_VOLCADO:
+	DS 1,RELLENO
+
+;----------------------------------------------------------------------
+; VUELCA_BUFER: Manda a la VRAM (0800h) los 4096 bytes de patrones de las 16 filas de
+; caracteres de la zona de juego, desde el búfer EF00h-FEFFh. ~28 % del tiempo.
+;----------------------------------------------------------------------
+VUELCA_BUFER:
+	LD	B,10h
+	LD	DE,0800h
+	XOR	A
+	LD	(FILA_VOLCADO),A
+L9DFE:
+	PUSH	BC
+	PUSH	DE
+	PUSH	DE
+	LD	(VRAM_DESTINO),DE
+	LD	A,(FILA_VOLCADO)
+	ADD	A,A
+	ADD	A,41h
+	LD	L,A
+	ADC	A,9Eh
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	CALL	VUELCA_MEDIA_FILA
+	LD	BC,80h
+	POP	HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	A,(FILA_VOLCADO)
+	ADD	A,A
+	ADD	A,41h
+	LD	L,A
+	ADC	A,9Eh
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	BC,10h
+	ADD	HL,BC
+	LD	(VRAM_DESTINO),DE
+	CALL	VUELCA_MEDIA_FILA
+	POP	DE
+	INC	D
+	LD	HL,FILA_VOLCADO
+	INC	(HL)
+	POP	BC
+	DJNZ	L9DFE
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+
+;----------------------------------------------------------------------
+; VUELCA_MEDIA_FILA: 128 bytes: 16 columnas x 8 líneas. El búfer va por columnas (cada línea
+; en una página de 256 bytes), así que se lee con INC H. DEC DE/INC DE son
+; esperas para el TMS9918.
+;----------------------------------------------------------------------
+VUELCA_MEDIA_FILA:
+	EX	DE,HL
+	LD	HL,(VRAM_DESTINO)
+	CALL	VRAM_ESCRIBE_EN
+	LD	A,10h
+L9E6A:
+	EX	AF,AF'
+	LD	H,D
+	LD	L,E
+	INC	DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OUT	(98h),A	; VDP: datos
+	DEC	DE
+	INC	DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OUT	(98h),A	; VDP: datos
+	DEC	DE
+	INC	DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OUT	(98h),A	; VDP: datos
+	DEC	DE
+	INC	DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	INC	H
+	LD	A,(HL)
+	INC	H
+	OUT	(98h),A	; VDP: datos
+	DEC	DE
+	INC	DE
+	EX	AF,AF'
+	DEC	A
+	JP	nz,L9E6A
+	RET
+
+;----------------------------------------------------------------------
+; DESPLAZA_HORIZONTE: Mueve las montañas del horizonte al girar.
+;----------------------------------------------------------------------
+DESPLAZA_HORIZONTE:
+	LD	HL,0E43Fh
+	LD	A,(HL)
+	INC	L
+	LD	E,(HL)
+	LD	(HL),A
+	LD	A,E
+	OR	A
+	JR	z,L9EE0
+	ADD	A,A
+	ADD	A,A
+	LD	E,A
+	SBC	A,A
+	LD	D,A
+	LD	HL,(0E441h)
+	LD	BC,0
+	JR	z,L9EB9
+	LD	BC,(0E4B0h)
+	ADD	HL,DE
+L9EB9:
+	LD	A,H
+	CP	5Bh
+	JP	nc,L9EDD
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	LD	A,C
+	CALL	ATRIB_A_COLOR
+	LD	DE,0FFE2h
+	ADD	HL,DE
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,0F0h
+	CALL	VRAM_RELLENA
+	POP	BC
+	POP	DE
+	POP	HL
+	LD	A,D
+	OR	A
+	JR	nz,L9EDD
+	ADD	HL,DE
+L9EDD:
+	LD	(0E441h),HL
+L9EE0:
+	RET
+
+;----------------------------------------------------------------------
+; PINTA_SUELO: Rellena el búfer con el suelo y el borde de la pista (con la pila).
+;----------------------------------------------------------------------
+PINTA_SUELO:
+	DI
+	LD	(9F73h),SP
+	LD	IX,0E681h
+	LD	HL,0FEFFh
+	LD	E,55h
+	LD	A,(0E6F0h)
+	RRA
+	JR	c,L9EF7
+	LD	E,0
+L9EF7:
+	LD	A,80h
+	SUB	(IX)
+	LD	B,A
+	JP	c,L9F20
+	JP	z,L9F20
+L9F03:
+	RRC	E
+	LD	D,E
+	LD	SP,HL
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	DJNZ	L9F76
+	LD	A,E
+	RRCA
+	JR	nc,L9F1D
+	RRCA
+L9F1D:
+	XOR	55h
+	LD	E,A
+L9F20:
+	LD	A,(IX)
+	DS 2,RELLENO	; INC	IXL
+	SUB	(IX)
+	JR	z,L9F20
+	JP	p,L9F45
+L9F2D:
+	LD	C,A
+	LD	A,(IX)
+	DS 2,RELLENO	; INC	IXL
+	SUB	(IX)
+	CP	50h
+	JR	nc,L9F4A
+	ADD	A,C
+	JR	z,L9F2D
+	JP	m,L9F2D
+	LD	B,A
+	LD	A,C
+	ADD	A,A
+	JR	L9F76
+L9F45:
+	LD	B,A
+	CP	50h
+	JR	c,L9F76
+L9F4A:
+	LD	DE,0
+	LD	C,15
+	LD	B,0FEh
+L9F51:
+	LD	A,H
+	DEC	H
+	CP	0EFh
+	JP	nz,L9F5F
+	LD	A,L
+	SUB	20h
+	LD	L,A
+	JR	c,L9F72
+	LD	H,B
+L9F5F:
+	LD	SP,HL
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	PUSH	DE
+	JP	L9F51
+L9F72:
+	LD	SP,0
+	RET
+L9F76:
+	LD	A,H
+	DEC	H
+	CP	0EFh
+	JP	nz,L9F03
+	LD	A,L
+	SUB	20h
+	LD	L,A
+	LD	H,0FEh
+	JP	L9F03
+PINTA_PISTA:
+	LD	A,(0E695h)
+	LD	D,A
+	CP	90h
+	RET	nc
+	LD	C,10h
+	SUB	81h
+	JR	c,L9F99
+	INC	A
+	NEG
+	ADD	A,10h
+	LD	C,A
+L9F99:
+	LD	A,C
+	LD	(9FE4h),A
+	LD	A,D
+	SUB	10h
+	LD	C,A
+	LD	E,0
+	CALL	BUFER_DIR
+	PUSH	DE
+	LD	HL,0A00Ch
+	LD	(9FB6h),HL
+	INC	HL
+	INC	HL
+	LD	(9FB9h),HL
+	LD	HL,0A0EDh
+	LD	(0FFFFh),HL
+	LD	(0FFFFh),HL
+	LD	H,0E7h
+	LD	A,(0E443h)
+	RRA
+	RRA
+	AND	15
+	LD	L,A
+	PUSH	HL
+	SUB	10h
+	NEG
+	ADD	A,A
+	ADD	A,0ECh
+	LD	L,A
+	ADC	A,9Fh
+	SUB	L
+	LD	H,A
+	LD	(9FA8h),HL
+	LD	(HL),1
+	INC	HL
+	LD	(HL),0F0h
+	INC	HL
+	LD	(HL),0FFh
+	INC	HL
+	LD	(HL),9
+	POP	HL
+	POP	DE
+	EXX
+	LD	B,0
+L9FE5:
+	LD	C,2
+	EXX
+	PUSH	DE
+	EXX
+L9FEA:
+	EXX
+	PUSH	HL
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LD	BC,0FFF0h
+	ADD	HL,BC
+	POP	HL
+	EXX
+	DEC	C
+	JP	nz,L9FEA
+	EXX
+	POP	DE
+	INC	D
+	INC	D
+	JP	nz,LA023
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0F0h
+LA023:
+	DEC	D
+	LD	A,L
+	ADD	A,10h
+	LD	L,A
+	EXX
+	DJNZ	L9FE5
+	RET
+
+;----------------------------------------------------------------------
+; CUENTA_TIEMPO: Reloj de carrera en BCD.
+;----------------------------------------------------------------------
+CUENTA_TIEMPO:
+	LD	A,(0E6F5h)
+	OR	A
+	RET	z
+	LD	HL,0E6C4h
+	CALL	SUMA_CENTESIMAS
+	LD	HL,0E6C1h
+	CALL	SUMA_CENTESIMAS
+	LD	A,(0E424h)
+	OR	A
+	RET	nz
+	LD	HL,0E41Eh
+	CALL	SUMA_CENTESIMAS
+	JP	PINTA_PUNTOS
+SUMA_CENTESIMAS:
+	LD	A,(HL)
+	ADD	A,8
+	DAA
+	LD	(HL),A
+	RET	nc
+	DEC	L
+	LD	A,(HL)
+	ADD	A,1
+	DAA
+	LD	(HL),A
+	CP	60h
+	RET	nz
+	LD	(HL),0
+	DEC	L
+	LD	A,(HL)
+	ADD	A,1
+	DAA
+	LD	(HL),A
+	RET
+
+;----------------------------------------------------------------------
+; SEMAFORO: Semáforo y rótulo START.
+;----------------------------------------------------------------------
+SEMAFORO:
+	DEC	A
+	JP	z,LA074
+	DEC	A
+	JP	z,LA0CE
+	CALL	LA0F2
+	CALL	LA14C
+	JP	L0C07
+LA074:
+	LD	HL,0F509h
+	LD	DE,2771h
+	LD	BC,0C11h
+	CALL	LB6D8
+	LD	HL,0F501h
+	LD	DE,8680h
+	LD	BC,080Bh
+	CALL	LB6D8
+	CALL	L0C07
+	LD	A,(0E44Bh)
+	INC	A
+	LD	(0E44Bh),A
+	RRCA
+	RRCA
+	AND	3Fh
+	RET	z
+	CP	5
+	JP	z,LA0C3
+	LD	C,2
+	CP	4
+	JR	nz,LA0A8
+	LD	C,4
+LA0A8:
+	LD	HL,5922h
+	CALL	SUMA_A_HL
+	LD	A,(9EB0h)
+	AND	0F8h
+	OR	C
+	CALL	ATRIB_A_COLOR
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	RET
+LA0C3:
+	LD	A,0FFh
+	LD	(0E6C9h),A
+	LD	(0E6F5h),A
+	JP	LA155
+LA0CE:
+	LD	HL,0E449h
+	LD	A,(HL)
+	CP	0F0h
+	JR	z,LA0DB
+	DEC	(HL)
+	DEC	(HL)
+	JP	LA0F2
+LA0DB:
+	LD	HL,5923h
+	LD	A,(9EB0h)
+	CALL	ATRIB_A_COLOR
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,20h
+	CALL	VRAM_RELLENA
+	JP	LA155
+LA0F2:
+	LD	A,(0E449h)
+	ADD	A,11h
+	CP	11h
+	LD	C,11h
+	LD	HL,2771h
+	JR	nc,LA10E
+	LD	C,A
+	LD	A,(0E449h)
+	NEG
+	ADD	A,A
+	ADD	A,A
+	LD	B,A
+	ADD	A,A
+	ADD	A,B
+	CALL	SUMA_A_HL
+LA10E:
+	LD	B,12
+	EX	DE,HL
+	LD	HL,0EF09h
+	LD	A,(0E449h)
+	OR	A
+	JP	m,LA11D
+	ADD	A,H
+	LD	H,A
+LA11D:
+	PUSH	HL
+	CALL	LB6D8
+	LD	A,(0E449h)
+	CP	0F6h
+	JP	m,LA14A
+	ADD	A,11
+	CP	11
+	LD	C,11
+	LD	HL,8680h
+	JR	nc,LA140
+	LD	C,A
+	LD	A,(0E449h)
+	NEG
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	CALL	SUMA_A_HL
+LA140:
+	LD	B,8
+	POP	DE
+	LD	E,1
+	EX	DE,HL
+	CALL	LB6D8
+	PUSH	HL
+LA14A:
+	POP	HL
+	RET
+LA14C:
+	LD	HL,0E449h
+	INC	(HL)
+	INC	(HL)
+	LD	A,(HL)
+	CP	8
+	RET	nz
+LA155:
+	LD	HL,0E44Ah
+	INC	(HL)
+	RET
+
+;----------------------------------------------------------------------
+; PREPARA_RIVALES: Velocidad y posición inicial de los 11 rivales, al azar.
+;----------------------------------------------------------------------
+PREPARA_RIVALES:
+	LD	B,11
+	LD	IX,0E524h
+	LD	HL,254Eh
+LA163:
+	LD	(IX+1),0
+	LD	(IX),0
+	CALL	ALEATORIO
+	AND	3Fh
+	OR	0C0h
+	LD	(IX+3),A
+	LD	A,(HL)
+	LD	(IX+11),A
+	INC	HL
+	LD	A,(HL)
+	LD	(IX+12),A
+	LD	(IX+10),0
+	INC	HL
+	LD	A,(HL)
+	LD	(IX+2),A
+	INC	HL
+	LD	A,(HL)
+	LD	(IX+4),A
+	INC	HL
+	LD	DE,13
+	ADD	IX,DE
+	DJNZ	LA163
+	RET
+RIVAL_SIGUIENTE:
+	PUSH	IX
+	LD	IX,(0E451h)
+LA19B:
+	LD	A,(0E454h)
+	DEC	A
+	CP	(IX)
+	JR	nz,LA1AF
+	CALL	LA1B6
+	DS 2,RELLENO	; LD	A,IXL
+	ADD	A,4
+	DS 2,RELLENO	; LD	IXL,A
+	JR	LA19B
+LA1AF:
+	LD	(0E451h),IX
+	POP	IX
+	RET
+LA1B6:
+	EXX
+	LD	A,23h
+	LD	(0C001h),A
+	LD	(LB9AF),A
+	XOR	A
+	LD	(0BFE6h),A
+	LD	A,(IX+2)
+	LD	L,A
+	ADD	A,A
+	ADD	A,L
+	ADD	A,A
+	ADD	A,A
+	ADD	A,L
+	LD	L,A
+	LD	H,0
+	LD	DE,0E529h
+	ADD	HL,DE
+	LD	C,(HL)
+	DEC	C
+	JP	m,LA7D9
+	INC	C
+	INC	L
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	LD	A,(IX+3)
+	INC	A
+	AND	0FEh
+	LD	(0A1E7h),A
+	LD	HL,(0E500h)
+	LD	A,C
+	SUB	(HL)
+	JP	LBFE0
+MUEVE_RIVALES:
+	LD	A,(0E6C9h)
+	OR	A
+	JR	z,LA1FF
+	LD	A,(0E6CAh)
+	CP	18h
+	JR	nc,LA1FF
+	INC	A
+	LD	(0E6CAh),A
+LA1FF:
+	LD	IX,0E524h
+	XOR	A
+	LD	(0E453h),A
+	DEC	A
+	LD	(0E5B3h),A
+	LD	B,11
+LA20D:
+	LD	A,(0E450h)
+	OR	A
+	JR	z,LA219
+	BIT	0,(IX)
+	JR	z,LA23B
+LA219:
+	LD	A,(0E6C9h)
+	OR	A
+	JR	z,LA23B
+	BIT	1,(IX)
+	CALL	z,LA251
+	BIT	1,(IX)
+	CALL	nz,ADELANTAMIENTOS
+	CALL	LB11A
+	CALL	IA_RIVAL
+	LD	A,(IX+12)
+	CP	4
+	CALL	nc,LB3D7
+LA23B:
+	RES	0,(IX)
+	CALL	ORDENA_FIGURAS
+	LD	DE,13
+	ADD	IX,DE
+	DJNZ	LA20D
+	LD	HL,0E450h
+	LD	A,(HL)
+	OR	A
+	RET	z
+	DEC	(HL)
+	RET
+LA251:
+	LD	A,11
+	SUB	B
+	ADD	A,A
+	LD	HL,0E6CAh
+	CP	(HL)
+	RET	nc
+	LD	A,(IX+1)
+	ADD	A,6
+	LD	(IX+1),A
+	CP	(IX+2)
+	RET	c
+	LD	A,(IX+2)
+	LD	(IX+1),A
+	SET	1,(IX)
+	RET
+LA271:
+	LD	B,3
+	LD	E,A
+	XOR	A
+LA275:
+	RL	E
+	JR	nc,LA27A
+	ADD	A,C
+LA27A:
+	ADD	A,A
+	DJNZ	LA275
+	RRA
+	SRA	A
+	SRA	A
+	SRA	A
+	ADC	A,0
+	RET
+MUEVE_DECORADO:
+	LD	A,(0A2D8h)
+	LD	HL,0E6F6h
+	ADD	A,(HL)
+	CP	5
+	JR	nc,LA295
+	LD	(HL),A
+	JR	LA29E
+LA295:
+	XOR	A
+	LD	(0A2D8h),A
+	LD	A,5
+	LD	(EFECTO_PEDIDO),A
+LA29E:
+	LD	A,(HL)
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	LD	L,A
+	ADD	A,A
+	ADD	A,L
+	ADD	A,0D9h
+	LD	L,A
+	ADC	A,0A2h
+	SUB	L
+	LD	H,A
+	LD	(0A2D5h),SP
+	LD	SP,HL
+	LD	HL,0EFC2h
+	LD	B,8
+LA2B7:
+	POP	DE
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	INC	H
+	POP	DE
+	LD	(HL),D
+	DEC	L
+	LD	(HL),E
+	INC	H
+	DJNZ	LA2B7
+	LD	HL,0EFE2h
+	LD	B,4
+LA2C8:
+	POP	DE
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	INC	H
+	POP	DE
+	LD	(HL),D
+	DEC	L
+	LD	(HL),E
+	INC	H
+	DJNZ	LA2C8
+	LD	SP,0
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 1,RELLENO
+
+;----------------------------------------------------------------------
+; CARGA_CINTA: Carga un bloque turbo (marca FFh) en IX, DE bytes; repite hasta que vaya bien.
+;----------------------------------------------------------------------
+CARGA_CINTA:
+	PUSH	IX
+	PUSH	DE
+	LD	A,0FFh
+	SCF
+	CALL	LD_BYTES
+	POP	DE
+	POP	IX
+	JR	c,LA3D9
+	JR	CARGA_CINTA
+LA3D9:
+	XOR	A
+	CALL	ATRIB_A_COLOR
+	CALL	PON_BORDE
+	RET
+
+;----------------------------------------------------------------------
+; LD_BYTES: Rutina LD-BYTES de la ROM del Spectrum pasada a MSX: lee la señal por el
+; bit 7 del registro 14 del PSG y cambia el color del borde. En la CAS está
+; cambiada por una que usa TAPIN de la BIOS.
+;----------------------------------------------------------------------
+	IF CAS
+; Variante de la CAS: lee la cinta con TAPIN de la BIOS a través de un trampolín
+; montado en FC8Eh-FCA5h (guarda lo que hubiera allí y lo repone al acabar).
+LD_BYTES:
+	DI
+	EX	AF,AF'
+	EXX
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	LD	HL,0FCA6h
+	LD	B,12
+CA3EC:
+	DEC	HL
+	LD	D,(HL)
+	DEC	HL
+	LD	E,(HL)
+	PUSH	DE
+	DJNZ	CA3EC
+	LD	A,H
+	LD	H,B
+	LD	L,B
+	ADD	HL,SP
+	LD	SP,0FCA4h
+	LD	DE,0C961h
+	PUSH	DE
+	LD	DE,0EDD9h
+	PUSH	DE
+	LD	DE,0E1h
+	PUSH	DE
+	LD	DE,0CDD9h
+	PUSH	DE
+	LD	DE,69EDh
+	PUSH	DE
+	PUSH	HL
+	EXX
+	LD	C,0A8h
+	IN	H,(C)
+	AND	H
+	LD	L,A
+	CALL	0FC9Ah
+	JR	c,CA45C
+	LD	A,0E4h
+	LD	(0FC9Eh),A
+	CALL	0FC9Ah
+	JR	c,CA45C
+	LD	B,A
+	EX	AF,AF'
+	CP	B
+	SCF
+	JR	nz,CA45C
+	JR	CA449
+CA42D:
+	POP	AF
+	PUSH	IX
+	EXX
+	POP	BC
+	LD	HL,0372h
+	ADD	HL,BC
+	JR	nc,CA444
+	EX	DE,HL
+	LD	HL,0FFE8h
+	ADD	HL,DE
+	JR	c,CA444
+	POP	HL
+	PUSH	HL
+	ADD	HL,DE
+	LD	(HL),A
+	LD	A,(BC)
+CA444:
+	LD	(BC),A
+	EXX
+	INC	IX
+	DEC	DE
+CA449:
+	CALL	0FC9Ah
+	JR	c,CA45C
+	PUSH	AF
+	XOR	B
+	LD	B,A
+	LD	A,E
+	OUT	(99h),A
+	OR	D
+	LD	A,87h
+	OUT	(99h),A
+	JR	nz,CA42D
+	POP	AF
+CA45C:
+	SBC	A,A
+	OR	B
+	EX	AF,AF'
+	LD	A,0F3h
+	LD	(0FC9Eh),A
+	XOR	A
+	CALL	0FC9Ah
+	EXX
+	POP	HL
+	LD	SP,HL
+	LD	HL,0FC8Eh
+	LD	B,12
+CA470:
+	POP	DE
+	LD	(HL),E
+	INC	HL
+	LD	(HL),D
+	INC	HL
+	DJNZ	CA470
+	POP	HL
+	POP	DE
+	POP	BC
+	EXX
+	EX	AF,AF'
+	CP	1
+	RET
+	DS 2,RELLENO
+	ELSE
+LD_BYTES:
+	INC	D
+	EX	AF,AF'
+	DEC	D
+	DI
+	LD	A,8
+	OUT	(0ABh),A	; PPI: control
+	LD	A,14
+	OUT	(0A0h),A	; PSG: registro
+	EXX
+	LD	BC,99h
+	LD	D,87h
+	OUT	(C),B
+	OUT	(C),D
+	EXX
+	IN	A,(0A2h)	; PSG: lee
+	RRA
+	AND	40h
+	OR	2
+	LD	C,A
+	CP	A
+LA401:
+	RET	nz
+LA402:
+	CALL	LD_FLANCO
+	JR	nc,LA401
+	LD	HL,0415h
+LA40A:
+	DJNZ	LA40A
+	DEC	HL
+	LD	A,H
+	OR	L
+	JR	nz,LA40A
+	CALL	LD_FLANCO2
+	JR	nc,LA401
+LA416:
+	LD	B,9Ch
+	CALL	LD_FLANCO2
+	JR	nc,LA401
+	LD	A,0C6h
+	CP	B
+	JR	nc,LA402
+	INC	H
+	JR	nz,LA416
+LA425:
+	LD	B,0C9h
+	CALL	LD_FLANCO
+	JR	nc,LA401
+	LD	A,B
+	CP	0D4h
+	JR	nc,LA425
+	CALL	LD_FLANCO
+	RET	nc
+	LD	A,C
+	XOR	2
+	LD	C,A
+	LD	H,0
+	LD	B,0B0h
+	JR	LA457
+LA43F:
+	EX	AF,AF'
+	JR	nz,LA447
+	LD	(IX),L
+	JR	LA451
+LA447:
+	RL	C
+	XOR	L
+	RET	nz
+	LD	A,C
+	RRA
+	LD	C,A
+	INC	DE
+	JR	LA453
+LA451:
+	INC	IX
+LA453:
+	DEC	DE
+	EX	AF,AF'
+	LD	B,0B2h
+LA457:
+	LD	L,1
+LA459:
+	CALL	LD_FLANCO2
+	RET	nc
+	LD	A,0CBh
+	CP	B
+	RL	L
+	LD	B,0B0h
+	JP	nc,LA459
+	LD	A,H
+	XOR	L
+	LD	H,A
+	LD	A,D
+	OR	E
+	JR	nz,LA43F
+	PUSH	AF
+	LD	A,9
+	OUT	(0ABh),A	; PPI: control
+	POP	AF
+	LD	A,H
+	CP	1
+	RET
+LD_FLANCO2:
+	CALL	LD_FLANCO
+	RET	nc
+LD_FLANCO:
+	LD	A,16h
+LA47E:
+	DEC	A
+	JR	nz,LA47E
+	ENDIF
+	AND	A
+LA482:
+	INC	B
+	RET	z
+	LD	A,7Fh
+	IN	A,(0A2h)	; PSG: lee
+	RRA
+	XOR	C
+	AND	40h
+	JR	z,LA482
+	LD	A,C
+	CPL
+	LD	C,A
+	EXX
+	OUT	(C),B
+	OUT	(C),D
+	INC	B
+	EXX
+	SCF
+	RET
+CHOQUE:
+	LD	A,(0E446h)
+	INC	A
+	RET	z
+	LD	A,(0E46Eh)
+	OR	A
+	RET	nz
+	LD	A,0FFh
+	LD	(0B0E4h),A
+	LD	A,(0E46Ch)
+	OR	A
+	RET	z
+	LD	A,(0E6F2h)
+	OR	A
+	JP	nz,LB098
+	RET
+
+;----------------------------------------------------------------------
+; ORDENA_FIGURAS: Ordena por distancia los coches y objetos que se ven.
+;----------------------------------------------------------------------
+ORDENA_FIGURAS:
+	LD	DE,(0E522h)
+	LD	L,(IX+11)
+	LD	H,(IX+12)
+	OR	A
+	SBC	HL,DE
+	LD	A,L
+	CP	14h
+	RET	nc
+	LD	(IX+8),A
+	OR	A
+	JR	z,LA4FB
+	ADD	A,6Fh
+	LD	L,A
+	LD	H,0E4h
+	LD	A,(HL)
+	INC	L
+	SUB	(HL)
+	DEC	L
+	LD	C,(IX+10)
+	PUSH	BC
+	PUSH	HL
+	CALL	LB4C1
+	POP	HL
+	POP	BC
+	NEG
+	LD	C,A
+	ADD	A,(HL)
+	LD	(IX+5),A
+	LD	A,C
+	OR	A
+	JP	p,LA4EE
+	NEG
+LA4EE:
+	LD	(IX+9),A
+	SET	0,(IX)
+	CALL	LA592
+	JP	LA52D
+LA4FB:
+	LD	A,(0E470h)
+	SUB	80h
+	NEG
+	LD	C,A
+	LD	A,(0E521h)
+	SUB	(IX+10)
+	JR	z,LA50C
+	RET	nc
+LA50C:
+	NEG
+	AND	0E0h
+	CALL	LB4AE
+	LD	E,A
+	LD	A,(0E6EFh)
+	NEG
+	CALL	LB50E
+	LD	(IX+9),A
+	NEG
+	ADD	A,80h
+	LD	(IX+5),A
+	SET	0,(IX)
+	CALL	LA592
+LA52D:
+	PUSH	BC
+	LD	L,(IX+10)
+	LD	H,(IX+11)
+	LD	DE,(0E6EFh)
+	OR	A
+	SBC	HL,DE
+	LD	A,H
+	DS 2,RELLENO	; LD	IYL,A
+	LD	HL,0E453h
+	INC	(HL)
+	LD	C,(HL)
+	LD	HL,0E5B3h
+LA546:
+	BIT	7,(HL)
+	JR	z,LA552
+	POP	BC
+	CALL	LA57F
+	INC	L
+	LD	(HL),0FFh
+	RET
+LA552:
+	LD	A,(IX+8)
+	CP	(HL)
+	JR	c,LA578
+	JR	nz,LA562
+	INC	L
+	LD	A,(HL)
+	DEC	L
+	CP	(IX+9)
+	JR	nc,LA578
+LA562:
+	LD	A,C
+	ADD	A,A
+	ADD	A,A
+	LD	C,A
+	LD	B,0
+	LD	E,L
+	LD	D,H
+	ADD	HL,BC
+	DEC	L
+	INC	E
+	INC	E
+	INC	E
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LDDR
+	INC	L
+	POP	BC
+	JR	LA57F
+LA578:
+	LD	A,L
+	ADD	A,4
+	LD	L,A
+	DEC	C
+	JR	LA546
+LA57F:
+	LD	A,(IX+8)
+	LD	(HL),A
+	INC	L
+	LD	A,(IX+9)
+	LD	(HL),A
+	INC	L
+	LD	A,11
+	SUB	B
+	LD	(HL),A
+	INC	L
+	DS 2,RELLENO	; LD	A,IYL
+	LD	(HL),A
+	RET
+LA592:
+	PUSH	BC
+	LD	A,(IX+8)
+	ADD	A,A
+	LD	L,A
+	LD	H,0EBh
+	LD	A,(HL)
+	INC	L
+	LD	H,(HL)
+	LD	L,A
+	LD	E,(IX+9)
+	SLA	E
+	LD	D,0
+	OR	A
+	SBC	HL,DE
+	PUSH	HL
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	INC	H
+	INC	H
+	LD	A,(HL)
+	DEC	L
+	LD	L,(HL)
+	LD	H,A
+	SBC	HL,DE
+	LD	A,L
+	LD	C,(IX+4)
+	CALL	LB4E8
+	POP	HL
+	ADD	A,(HL)
+	LD	(IX+6),A
+	INC	L
+	LD	A,(HL)
+	ADC	A,0
+	LD	(IX+7),A
+	POP	BC
+	RET
+PINTA_LETRA_GRANDE:
+	EXX
+	LD	L,A
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	A,H
+	ADD	A,4
+	LD	H,A
+	EX	DE,HL
+	LD	HL,(99A5h)
+	LD	B,8
+LA5DA:
+	PUSH	DE
+	PUSH	HL
+	LD	DE,8000h
+	AND	A
+	SBC	HL,DE
+	POP	HL
+	POP	DE
+	JR	c,LA5F7
+	LD	A,(DE)
+	LD	(HL),A
+	INC	H
+	LD	A,(DE)
+	LD	(HL),A
+	CALL	BUFER_BAJA
+	INC	DE
+	DJNZ	LA5DA
+	LD	HL,99A5h
+	INC	(HL)
+	EXX
+	RET
+LA5F7:
+	EX	DE,HL
+	CALL	DIR_PATRON
+	EX	DE,HL
+	LD	B,2
+LA5FE:
+	PUSH	BC
+	CALL	VRAM_ESCRIBE_EN
+	LD	B,4
+LA604:
+	LD	A,(DE)
+	OUT	(98h),A	; VDP: datos
+	INC	HL
+	DEC	HL
+	LD	A,(DE)
+	OUT	(98h),A	; VDP: datos
+	INC	DE
+	DJNZ	LA604
+	INC	H
+	POP	BC
+	DJNZ	LA5FE
+	LD	HL,99A5h
+	INC	(HL)
+	EXX
+	RET
+
+;----------------------------------------------------------------------
+; PINTA_JUGADOR: Coche del jugador y cabeza del piloto.
+;----------------------------------------------------------------------
+PINTA_JUGADOR:
+	CALL	PINTA_COCHE_JUGADOR
+	LD	A,(0E432h)
+	OR	A
+	RET	nz
+	CALL	PINTA_CABEZA
+	LD	A,(VELOCIDAD)
+	CP	3Ch
+	CALL	nc,PINTA_HUMO
+	RET
+PINTA_CABEZA:
+	LD	A,0
+	CP	5
+	JR	c,LA635
+	SUB	5
+LA635:
+	LD	H,A
+	LD	L,0
+	SRL	H
+	RR	L
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	LD	D,0
+	JR	z,LA645
+	DEC	D
+LA645:
+	NEG
+	LD	E,A
+	ADD	HL,DE
+	LD	DE,CABEZA_PILOTO
+	ADD	HL,DE
+	LD	A,(0A62Eh)
+	CP	5
+	LD	DE,0FDAEh
+	JR	c,LA658
+	INC	D
+LA658:
+	LD	B,14
+	LD	A,0
+	OR	A
+	JP	z,FIGURA_MASCARA_1
+	JP	LAB0B
+PINTA_COCHE_JUGADOR:
+	LD	A,(0E446h)
+	OR	A
+	JR	nz,LA6A0
+	LD	A,(0E462h)
+	OR	A
+	JP	p,LA672
+	NEG
+LA672:
+	LD	C,0
+	CP	6
+	JR	c,LA67E
+	INC	C
+	CP	10
+	JR	c,LA67E
+	INC	C
+LA67E:
+	LD	A,(0E462h)
+	OR	A
+	LD	A,C
+	JP	m,LA68B
+	LD	A,8
+	SUB	C
+	AND	7
+LA68B:
+	LD	C,A
+	LD	HL,(0E6F0h)
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(HL)
+	CP	4
+	JP	m,LA69D
+	LD	A,C
+	ADD	A,8
+	LD	C,A
+LA69D:
+	LD	A,C
+	JR	LA6DA
+LA6A0:
+	INC	A
+	JR	z,LA6BB
+	LD	A,(0A721h)
+	DEC	A
+	LD	(0A721h),A
+	JR	nz,LA6D7
+	XOR	A
+	LD	(0E446h),A
+	LD	HL,0
+	LD	(0E461h),HL
+	CALL	SONIDO_2
+	JR	LA6D7
+LA6BB:
+	LD	A,(0E448h)
+	INC	A
+	AND	7
+	LD	(0E448h),A
+	JR	nz,LA6D7
+	LD	A,(VELOCIDAD)
+	OR	A
+	JR	nz,LA6D7
+	XOR	A
+	LD	(0E446h),A
+	DEC	A
+	LD	(0E46Eh),A
+	CALL	SONIDO_2
+LA6D7:
+	LD	A,(0E448h)
+LA6DA:
+	LD	(0A62Eh),A
+	LD	C,A
+	ADD	A,A
+	ADD	A,A
+	LD	HL,88D8h
+	CALL	SUMA_A_HL
+	LD	E,(HL)
+	INC	HL
+	LD	D,(HL)
+	INC	HL
+	LD	A,(HL)
+	LD	(0A65Bh),A
+	LD	C,A
+	INC	HL
+	LD	A,(HL)
+	LD	(0A62Eh),A
+	ADD	A,A
+	LD	HL,8918h
+	CALL	SUMA_A_HL
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	B,(HL)
+	INC	HL
+	INC	C
+	DEC	C
+	LD	A,(HL)
+	INC	HL
+	JR	z,LA714
+	CP	6
+	JP	z,LAAB2
+	CP	8
+	JP	z,LAA49
+	JP	LA9D8
+LA714:
+	CP	6
+	JP	z,FIGURA_MASCARA_ANCHA
+	CP	8
+	JP	z,LA94D
+	JP	LA923
+	DS 1,RELLENO
+PINTA_HUMO:
+	LD	A,(0A62Eh)
+	CP	3
+	RET	z
+	CP	4
+	RET	z
+	LD	A,(0E6F0h)
+	ADD	A,20h
+	LD	L,A
+	LD	H,0EAh
+	LD	A,(HL)
+	ADD	A,3
+	CP	7
+	JR	nc,LA743
+	LD	A,(0A62Eh)
+	AND	3
+	RET	z
+	CP	3
+	RET	z
+LA743:
+	LD	A,(0A62Eh)
+	CP	5
+	JR	c,LA74C
+	SUB	5
+LA74C:
+	AND	3
+	ADD	A,A
+	ADD	A,0
+	LD	(0A76Dh),A
+	ADD	A,A
+	LD	HL,0AF9Eh
+	CALL	SUMA_A_HL
+	LD	A,(0A750h)
+	XOR	1
+	LD	(0A750h),A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	PUSH	HL
+	LD	A,(0A65Bh)
+	OR	A
+	LD	A,0
+	JR	z,LA772
+	ADD	A,6
+LA772:
+	ADD	A,A
+	LD	HL,0A7A1h
+	CALL	SUMA_A_HL
+	LD	E,(HL)
+	INC	HL
+	LD	D,(HL)
+	POP	HL
+	LD	B,(HL)
+	INC	HL
+	LD	A,(0A65Bh)
+	OR	A
+	LD	A,(HL)
+	INC	HL
+	JR	z,LA794
+	CP	6
+	JP	z,FIGURA_MASCARA_ANCHA
+	CP	7
+	JP	z,LA977
+	JP	LA9D8
+LA794:
+	CP	6
+	JP	z,FIGURA_MASCARA_ANCHA
+	CP	7
+	JP	z,LA8DD
+	JP	LA923
+	DS 16,RELLENO
+	DS 8,RELLENO
+
+;----------------------------------------------------------------------
+; FIGURA_MASCARA_2: Dibuja una figura con máscara (pares máscara/dibujo leídos con POP).
+;----------------------------------------------------------------------
+FIGURA_MASCARA_2:
+	LD	(0A7D7h),SP
+	LD	SP,HL
+LA7BE:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA7D0
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA7D0:
+	DJNZ	LA7BE
+	LD	HL,0
+	ADD	HL,SP
+	LD	SP,0
+LA7D9:
+	EXX
+	RET
+	LD	(0A800h),SP
+	LD	SP,HL
+LA7E0:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	DEC	E
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA7F9
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA7F9:
+	DJNZ	LA7E0
+	LD	HL,0
+	ADD	HL,SP
+	LD	SP,0
+	EXX
+	RET
+LA804:
+	LD	(0A82Ch),SP
+	LD	SP,HL
+LA809:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	DEC	E
+	DEC	E
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA829
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA829:
+	DJNZ	LA809
+	LD	SP,0
+	EXX
+	RET
+FIGURA_MASCARA_1:
+	LD	(0A85Fh),SP
+	LD	SP,HL
+LA835:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	DEC	E
+	DEC	E
+	DEC	E
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA85C
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA85C:
+	DJNZ	LA835
+	LD	SP,0
+	EXX
+	RET
+	LD	(0A899h),SP
+	LD	SP,HL
+LA868:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	LD	A,E
+	SUB	4
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA896
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA896:
+	DJNZ	LA868
+	LD	SP,0
+	EXX
+	RET
+FIGURA_MASCARA_ANCHA:
+	LD	(0A8D9h),SP
+	LD	SP,HL
+LA8A2:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	LD	A,E
+	SUB	5
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA8D6
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA8D6:
+	DJNZ	LA8A2
+	LD	SP,0
+	EXX
+	RET
+LA8DD:
+	LD	(0A91Fh),SP
+	LD	SP,HL
+LA8E2:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	LD	A,E
+	SUB	6
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA91C
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA91C:
+	DJNZ	LA8E2
+	LD	SP,0
+	EXX
+	RET
+LA923:
+	LD	(0A949h),SP
+	LD	SP,HL
+	LD	C,B
+LA929:
+	LD	B,9
+LA92B:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	DJNZ	LA92B
+	LD	A,E
+	SUB	9
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA944
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA944:
+	DEC	C
+	JP	nz,LA929
+	LD	SP,0
+	EXX
+	RET
+LA94D:
+	LD	(0A973h),SP
+	LD	SP,HL
+	LD	C,B
+LA953:
+	LD	B,8
+LA955:
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	DJNZ	LA955
+	LD	A,E
+	SUB	8
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA96E
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA96E:
+	DEC	C
+	JP	nz,LA953
+	LD	SP,0
+	EXX
+	RET
+LA977:
+	DS 2,RELLENO	; LD	IXL,B
+	LD	(0A9D4h),SP
+	LD	BC,6
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	SP,HL
+	LD	H,2
+LA986:
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	LD	A,E
+	ADD	A,6
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LA9CE
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LA9CE:
+	DS 2,RELLENO	; DEC	IXL
+	JP	nz,LA986
+	LD	SP,0
+	EXX
+	RET
+LA9D8:
+	DS 2,RELLENO	; LD	IXL,B
+	LD	(0AA45h),SP
+	LD	BC,8
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	SP,HL
+	LD	H,2
+LA9E7:
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	LD	A,E
+	ADD	A,8
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LAA3F
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LAA3F:
+	DS 2,RELLENO	; DEC	IXL
+	JP	nz,LA9E7
+	LD	SP,0
+	EXX
+	RET
+LAA49:
+	DS 2,RELLENO	; LD	IXL,B
+	LD	(0AAAEh),SP
+	LD	BC,7
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	SP,HL
+	LD	H,2
+LAA58:
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	LD	A,E
+	ADD	A,7
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LAAA8
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LAAA8:
+	DS 2,RELLENO	; DEC	IXL
+	JP	nz,LAA58
+	LD	SP,0
+	EXX
+	RET
+LAAB2:
+	DS 2,RELLENO	; LD	IXL,B
+	LD	(0AB07h),SP
+	LD	BC,5
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	SP,HL
+	LD	H,2
+LAAC1:
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	LD	A,E
+	ADD	A,5
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LAB01
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LAB01:
+	DS 2,RELLENO	; DEC	IXL
+	JP	nz,LAAC1
+	LD	SP,0
+	EXX
+	RET
+LAB0B:
+	DS 2,RELLENO	; LD	IXL,B
+	LD	(0AB50h),SP
+	LD	BC,3
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	SP,HL
+	LD	H,2
+LAB1A:
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	DEC	E
+	POP	BC
+	LD	A,(DE)
+	LD	L,C
+	AND	(HL)
+	LD	L,B
+	OR	(HL)
+	LD	(DE),A
+	LD	A,E
+	ADD	A,3
+	LD	E,A
+	INC	D
+	LD	A,D
+	CP	0FFh
+	JP	nz,LAB4A
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0EFh
+LAB4A:
+	DS 2,RELLENO	; DEC	IXL
+	JP	nz,LAB1A
+	LD	SP,0
+	EXX
+	RET
+LAB54:
+	CALL	SILENCIO_TODO
+	JP	BUCLE_PRINCIPAL
+
+;----------------------------------------------------------------------
+; CONTROL_JUGADOR: Volante, acelerador, marchas (LOW/HIGH) y salida de la pista.
+;----------------------------------------------------------------------
+CONTROL_JUGADOR:
+	CALL	LAC26
+	XOR	A
+	LD	(0E460h),A
+	CALL	LEE_CONTROLES
+	LD	C,A
+	AND	0C0h
+	CP	0C0h
+	JP	z,LAB54
+	LD	A,C
+	AND	20h
+	JR	z,LAB8B
+	CALL	SILENCIO
+	LD	A,7
+	LD	E,0BFh
+	CALL	PSG_ESCRIBE
+LAB7B:
+	CALL	LEE_CONTROLES
+	LD	C,A
+	AND	0C0h
+	CP	0C0h
+	JP	z,LAB54
+	LD	A,C
+	AND	1Fh
+	JR	z,LAB7B
+LAB8B:
+	RR	C
+	JR	nc,LAB9C
+	LD	A,(0E6F6h)
+	OR	A
+	LD	A,1
+	JR	z,LAB99
+	NEG
+LAB99:
+	LD	(0A2D8h),A
+LAB9C:
+	CALL	MOTOR_ENCENDIDO
+	LD	A,(PSG_R7)
+	LD	E,A
+	LD	A,7
+	CALL	PSG_ESCRIBE
+	LD	A,(0E446h)
+	OR	A
+	JR	z,LABCB
+	INC	A
+	JR	z,LABBE
+	LD	A,(VELOCIDAD)
+	SUB	12
+	JR	nc,LABB9
+	XOR	A
+LABB9:
+	LD	(VELOCIDAD),A
+	JR	LABD0
+LABBE:
+	LD	A,(VELOCIDAD)
+	SUB	12
+	JR	nc,LABC6
+	XOR	A
+LABC6:
+	LD	(VELOCIDAD),A
+	JR	LAC04
+LABCB:
+	LD	A,(0E46Eh)
+	OR	A
+	RET	nz
+LABD0:
+	CALL	LAC89
+	RR	C
+	CALL	c,LACE9
+	RR	C
+	CALL	c,LAC45
+	RR	C
+	CALL	c,LAC67
+	LD	A,(0E6F6h)
+	OR	A
+	CALL	z,LACD5
+	LD	A,(0E460h)
+	OR	A
+	JR	nz,LAC04
+	LD	L,0
+	LD	A,(0E462h)
+	OR	A
+	JP	p,LABFB
+	INC	A
+	JR	LAC00
+LABFB:
+	DEC	A
+	JP	p,LAC00
+	XOR	A
+LAC00:
+	LD	H,A
+	LD	(0E461h),HL
+LAC04:
+	CALL	LC051
+	LD	A,(0E46Ch)
+	OR	A
+	JR	nz,LAC16
+	LD	A,(0E45Dh)
+	OR	A
+	JR	z,LAC13
+LAC13:
+	JP	LACF5
+LAC16:
+	LD	A,(VELOCIDAD)
+	CP	44h
+	JP	c,LACF5
+	SUB	8
+	LD	(VELOCIDAD),A
+	JP	LACF5
+LAC26:
+	LD	A,(0E446h)
+	INC	A
+	RET	z
+	LD	DE,(0E43Ch)
+	LD	HL,6Ah
+	XOR	A
+	DEC	A
+	SBC	HL,DE
+	JR	nc,LAC41
+	LD	HL,0190h
+	OR	A
+	SBC	HL,DE
+	JR	c,LAC41
+	INC	A
+LAC41:
+	LD	(0E46Ch),A
+	RET
+LAC45:
+	LD	A,0FFh
+	LD	(0E460h),A
+	LD	HL,(0E461h)
+	LD	A,H
+	CP	0F6h
+	RET	m
+	OR	A
+	LD	DE,0FE00h
+	JP	m,LAC5A
+	DEC	D
+	DEC	D
+LAC5A:
+	ADD	HL,DE
+	LD	A,H
+	CP	0F6h
+	JP	p,LAC63
+	LD	H,0F6h
+LAC63:
+	LD	(0E461h),HL
+	RET
+LAC67:
+	LD	A,0FFh
+	LD	(0E460h),A
+	LD	HL,(0E461h)
+	LD	A,H
+	CP	10
+	RET	p
+	OR	A
+	LD	DE,0200h
+	JP	p,LAC7C
+	INC	D
+	INC	D
+LAC7C:
+	ADD	HL,DE
+	LD	A,H
+	CP	11
+	JP	m,LAC85
+	LD	H,10
+LAC85:
+	LD	(0E461h),HL
+	RET
+LAC89:
+	LD	A,(0E46Ch)
+	OR	A
+	JR	z,LAC99
+	LD	A,(VELOCIDAD)
+	CP	44h
+	JR	c,LAC99
+	RRC	C
+	RET
+LAC99:
+	RRC	C
+	JR	c,LACA9
+	LD	A,(VELOCIDAD)
+	SUB	6
+	JR	nc,LACA5
+	XOR	A
+LACA5:
+	LD	(VELOCIDAD),A
+	RET
+LACA9:
+	LD	A,(0E6F6h)
+	OR	A
+	JR	nz,LACC0
+	LD	A,(VELOCIDAD)
+	CP	0B1h
+	RET	nc
+	CP	92h
+	LD	A,6
+	JR	c,LACCB
+	LD	A,2
+	JP	LACCB
+LACC0:
+	LD	A,(VELOCIDAD)
+	CP	7Dh
+	LD	A,2
+	JR	c,LACCB
+	LD	A,6
+LACCB:
+	LD	HL,VELOCIDAD
+	ADD	A,(HL)
+	LD	(HL),A
+	RET	nc
+	LD	A,0FFh
+	LD	(HL),A
+	RET
+LACD5:
+	LD	A,(VELOCIDAD)
+	CP	0B1h
+	RET	c
+	SUB	10
+	LD	(VELOCIDAD),A
+	CP	0B1h
+	RET	nc
+	LD	A,0B1h
+	LD	(VELOCIDAD),A
+	RET
+LACE9:
+	LD	A,(VELOCIDAD)
+	SUB	8
+	JR	nc,LACF1
+	XOR	A
+LACF1:
+	LD	(VELOCIDAD),A
+	RET
+LACF5:
+	LD	HL,0
+	LD	A,(VELOCIDAD)
+	OR	A
+	JR	nz,LAD01
+	LD	(0E461h),HL
+LAD01:
+	LD	A,(0E446h)
+	CP	0FEh
+	JR	nz,LAD0B
+	LD	C,L
+	JR	LAD24
+LAD0B:
+	LD	A,(0E6F0h)
+	LD	L,A
+	LD	H,0EAh
+	LD	A,(VELOCIDAD)
+	LD	C,A
+	LD	A,(HL)
+	CALL	LB4D2
+	LD	E,L
+	LD	D,H
+	SRA	H
+	RR	L
+	ADD	HL,DE
+	LD	A,H
+	RLA
+	SBC	A,A
+	LD	C,A
+LAD24:
+	LD	DE,(0E43Bh)
+	ADD	HL,DE
+	LD	A,(0E43Dh)
+	ADC	A,C
+	LD	C,A
+	LD	DE,(0E461h)
+	LD	A,D
+	RLA
+	SBC	A,A
+	EX	DE,HL
+	ADD	HL,DE
+	LD	(0E43Bh),HL
+	ADC	A,C
+	LD	(0E43Dh),A
+	JP	p,LAD48
+	LD	HL,0
+	LD	(0E43Ch),HL
+	RET
+LAD48:
+	LD	DE,(0E43Ch)
+	LD	HL,01E0h
+	OR	A
+	SBC	HL,DE
+	RET	nc
+	LD	HL,01E0h
+	LD	(0E43Ch),HL
+	RET
+LAD5A:
+	LD	A,(IY+1)
+	OR	A
+	RET	m
+	LD	A,(0E454h)
+	INC	A
+	CP	10h
+	RET	nc
+	EXX
+	AND	0FEh
+	SRL	A
+	LD	C,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,A
+	ADD	A,5Dh
+	LD	L,A
+	ADC	A,0AFh
+	SUB	L
+	LD	H,A
+	LD	(0AE12h),HL
+	LD	L,(IX)
+	LD	H,(IX+1)
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	EX	DE,HL
+	LD	A,(0E454h)
+	INC	A
+	AND	0FEh
+	ADD	A,A
+	ADD	A,43h
+	LD	C,A
+	ADC	A,0AFh
+	SUB	C
+	LD	B,A
+	LD	A,(BC)
+	LD	(0ADA9h),A
+	INC	BC
+	LD	A,(BC)
+	INC	BC
+	PUSH	BC
+	LD	C,A
+	RLA
+	SBC	A,A
+	LD	B,A
+	ADD	HL,BC
+	LD	(0E408h),HL
+	EX	DE,HL
+	INC	H
+	INC	H
+	LD	D,(HL)
+	DEC	HL
+	LD	E,(HL)
+	EX	DE,HL
+	LD	A,0
+	LD	C,A
+	RLA
+	SBC	A,A
+	LD	B,A
+	ADD	HL,BC
+	LD	(0E40Ah),HL
+	POP	HL
+	LD	A,(IY+1)
+	SUB	(HL)
+	LD	C,A
+	LD	(0AE22h),A
+	LD	A,(HL)
+	LD	(0AE67h),A
+	LD	A,1
+	LD	(0AE3Fh),A
+	INC	HL
+	LD	A,(HL)
+	LD	(0AE52h),A
+	LD	(0AE60h),A
+	JP	p,LADF1
+	PUSH	AF
+	LD	B,A
+	LD	A,C
+LADD2:
+	ADD	A,B
+	JR	nc,LADD2
+	JR	nz,LADD8
+	ADD	A,B
+LADD8:
+	LD	(0AE52h),A
+	SUB	B
+	NEG
+	INC	A
+	LD	(0AE3Fh),A
+	LD	A,(0AE67h)
+	ADD	A,C
+	LD	(0AE67h),A
+	JP	z,LAE0E
+	XOR	A
+	LD	(0AE22h),A
+	POP	AF
+LADF1:
+	CALL	LAE68
+	JP	c,LA7D9
+	LD	DE,(0E408h)
+	LD	A,D
+	OR	A
+	CALL	z,LAE11
+	LD	DE,(0E40Ah)
+	LD	A,D
+	OR	A
+	JP	nz,LA7D9
+	CALL	LAE11
+	EXX
+	RET
+LAE0E:
+	POP	AF
+	EXX
+	RET
+LAE11:
+	LD	HL,0
+	LD	A,E
+	AND	4
+	RRA
+	RRA
+	LD	C,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	LD	C,0
+	CALL	BUFER_DIR
+	PUSH	DE
+	LD	A,(HL)
+	LD	C,A
+	LD	DE,FIGURA_MASCARA_2
+	DEC	A
+	JR	z,LAE32
+	LD	DE,0A7DBh
+LAE32:
+	LD	(0AE56h),DE
+	INC	HL
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	(0AE62h),HL
+	LD	B,0
+	SLA	C
+	XOR	A
+	JR	LAE46
+LAE45:
+	ADD	A,C
+LAE46:
+	DJNZ	LAE45
+	CALL	SUMA_A_HL
+	LD	A,(0AE67h)
+	LD	(0AE5Ah),A
+	LD	B,0
+	POP	DE
+LAE54:
+	LD	C,B
+	CALL	FIGURA_MASCARA_2
+	EXX
+	LD	A,0
+	SUB	C
+	LD	(0AE5Ah),A
+	LD	B,0
+	LD	HL,0
+	JR	nz,LAE54
+	RET
+	DS 1,RELLENO
+LAE68:
+	PUSH	BC
+	PUSH	HL
+	PUSH	HL
+	LD	B,A
+	JP	p,LAE79
+	ADD	A,C
+	JP	nc,LAF3C
+	JP	z,LAF3C
+	LD	B,A
+	LD	C,0
+LAE79:
+	EXX
+	LD	A,(HL)
+	CP	10
+	EXX
+	JP	z,LAF3C
+	PUSH	BC
+	LD	HL,(0E40Ah)
+	LD	A,H
+	OR	A
+	JP	m,LAF41
+	CP	1
+	JR	c,LAE90
+	LD	L,0FFh
+LAE90:
+	LD	C,L
+	LD	HL,(0E408h)
+	LD	A,H
+	CP	1
+	JP	p,LAF41
+	OR	A
+	JR	z,LAE9F
+	LD	L,0
+LAE9F:
+	LD	B,L
+	LD	A,L
+	AND	7
+	LD	L,A
+	LD	H,0E4h
+	LD	E,(HL)
+	LD	A,C
+	AND	7
+	LD	L,A
+	LD	A,(HL)
+	CPL
+	LD	L,A
+	LD	H,E
+	LD	A,B
+	AND	0F8h
+	RRCA
+	RRCA
+	LD	E,A
+	LD	A,C
+	AND	0F8h
+	RRCA
+	RRCA
+	SUB	E
+	LD	E,A
+	LD	A,3Eh
+	SUB	E
+	LD	(0AEDDh),A
+	LD	E,B
+	POP	BC
+	CALL	BUFER_DIR
+	LD	A,E
+	AND	1Fh
+	LD	(0AED3h),A
+	LD	C,0FFh
+LAECF:
+	LD	A,E
+	AND	0E0h
+	ADD	A,0
+	LD	E,A
+	LD	A,(DE)
+	XOR	C
+	AND	H
+	XOR	C
+	LD	(DE),A
+	INC	E
+	LD	A,C
+LAEDC:
+	JR	LAEDC
+	DS 16,RELLENO
+	DS 7,RELLENO
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	(DE),A
+	INC	E
+	LD	A,(DE)
+	XOR	C
+	AND	L
+	XOR	C
+	LD	(DE),A
+	INC	D
+	INC	D
+	JP	nz,LAF2A
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0F0h
+LAF2A:
+	DEC	D
+	LD	A,B
+	CP	2
+	LD	C,0FFh
+	JR	z,LAF3A
+	LD	C,0AAh
+	AND	1
+	JR	z,LAF3A
+	LD	C,55h
+LAF3A:
+	DJNZ	LAECF
+LAF3C:
+	POP	HL
+	POP	DE
+	POP	BC
+	OR	A
+	RET
+LAF41:
+	POP	BC
+	POP	HL
+	POP	DE
+	POP	BC
+	SCF
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 6,RELLENO
+LAF8D:
+	LD	A,C
+	ADD	A,0D7h
+	LD	L,A
+	LD	H,0E6h
+	LD	A,(HL)
+	OR	A
+	RET	z
+	SCF
+	RET
+LAF98:
+	CALL	LAF8D
+	LD	(HL),0FFh
+	RET
+	DS 12,RELLENO
+SALTO:
+	LD	A,(0E46Eh)
+	OR	A
+	RET	z
+	LD	HL,0
+	LD	(0E461h),HL
+	LD	HL,(0E43Ch)
+	LD	DE,0100h
+	OR	A
+	SBC	HL,DE
+	JR	nz,LAFC5
+	XOR	A
+	LD	(0E46Eh),A
+	RET
+LAFC5:
+	JP	p,LAFD8
+	ADD	HL,DE
+	LD	BC,10h
+	ADD	HL,BC
+	OR	A
+	SBC	HL,DE
+	JP	m,LAFE6
+	LD	HL,0
+	JR	LAFE6
+LAFD8:
+	ADD	HL,DE
+	LD	BC,0FFF0h
+	ADD	HL,BC
+	OR	A
+	SBC	HL,DE
+	JP	p,LAFE6
+	LD	HL,0
+LAFE6:
+	ADD	HL,DE
+	LD	(0E43Ch),HL
+	RET
+MIRA_CHOQUES:
+	LD	A,(0E6E3h)
+	OR	A
+	RET	nz
+	LD	A,(0E446h)
+	OR	A
+	RET	nz
+	LD	A,(0E46Eh)
+	OR	A
+	RET	nz
+	LD	A,(0E43Dh)
+	OR	A
+	JR	nz,LB00A
+	LD	A,(0E6F0h)
+	ADD	A,61h
+	LD	DE,0BE8Fh
+	JR	LB012
+LB00A:
+	LD	A,(0E6F0h)
+	ADD	A,81h
+	LD	DE,0BE67h
+LB012:
+	LD	H,0EAh
+	LD	L,A
+	LD	A,(HL)
+	LD	(0B0E4h),A
+	ADD	A,A
+	ADD	A,A
+	EX	DE,HL
+	CALL	SUMA_A_HL
+	LD	E,(HL)
+	INC	HL
+	LD	D,(HL)
+	INC	HL
+	LD	C,(HL)
+	INC	HL
+	LD	B,(HL)
+	LD	HL,(0E43Ch)
+	OR	A
+	SBC	HL,DE
+	JR	c,LB036
+	LD	HL,(0E43Ch)
+	SBC	HL,BC
+	JP	c,LB098
+LB036:
+	LD	A,(0E432h)
+	OR	A
+	RET	nz
+	LD	A,0FFh
+	LD	(0B0E4h),A
+	LD	B,11
+	LD	IX,0E524h
+LB046:
+	PUSH	BC
+	LD	DE,(0E521h)
+	LD	A,(0E523h)
+	LD	C,A
+	LD	L,(IX+10)
+	LD	H,(IX+11)
+	LD	A,(IX+12)
+	OR	A
+	SBC	HL,DE
+	JP	c,LB08F
+	LD	A,H
+	OR	A
+	JR	nz,LB08F
+	LD	A,L
+	CP	80h
+	JR	nc,LB08F
+	LD	A,(IX+6)
+	LD	D,(IX+7)
+	AND	0F8h
+	LD	E,A
+	LD	HL,6Ch
+	OR	A
+	SBC	HL,DE
+	LD	DE,20h
+	ADD	HL,DE
+	LD	A,H
+	OR	A
+	JR	nz,LB08F
+	LD	A,L
+	CP	41h
+	JR	nc,LB08F
+	LD	A,(VELOCIDAD)
+	CP	(IX+1)
+	JR	c,LB08F
+	POP	BC
+	JP	LB098
+LB08F:
+	LD	BC,13
+	ADD	IX,BC
+	POP	BC
+	DJNZ	LB046
+	RET
+LB098:
+	LD	A,(0B0E4h)
+	CP	4
+	JR	z,LB0A6
+	LD	A,(0E432h)
+	CP	2
+	JR	nz,LB0C9
+LB0A6:
+	LD	A,0FEh
+	LD	(0E446h),A
+	LD	A,4
+	LD	(0A721h),A
+	LD	A,(0E43Dh)
+	LD	C,A
+	LD	A,(VELOCIDAD)
+	RRCA
+	RRCA
+	AND	3Fh
+	INC	C
+	DEC	C
+	JR	z,LB0C1
+	NEG
+LB0C1:
+	LD	H,A
+	LD	L,0
+	LD	(0E461h),HL
+	JR	LB0DE
+LB0C9:
+	LD	A,0FFh
+	LD	(0A2D8h),A
+	LD	(0E446h),A
+	LD	A,(0E43Dh)
+	OR	A
+	LD	A,0E0h
+	JR	nz,LB0DB
+	LD	A,20h
+LB0DB:
+	LD	(9DF1h),A
+LB0DE:
+	LD	A,3
+	LD	(EFECTO_PEDIDO),A
+	RET
+	DS 1,RELLENO
+ADELANTAMIENTOS:
+	LD	A,12
+	SUB	B
+	PUSH	BC
+	LD	HL,0E6D6h
+	LD	BC,12
+	CPDR
+	LD	A,(PUESTO)
+	CP	C
+	POP	BC
+	JR	c,LB0FF
+	CALL	ALEATORIO
+	CP	70h
+	JR	c,LB10D
+LB0FF:
+	LD	A,(IX+1)
+	CP	(IX+2)
+	RET	nc
+	INC	(IX+1)
+	INC	(IX+1)
+	RET
+LB10D:
+	LD	A,(IX+1)
+	CP	13
+	RET	z
+	DEC	(IX+1)
+	DEC	(IX+1)
+	RET
+LB11A:
+	LD	A,(IX+1)
+	ADD	A,(IX+10)
+	LD	(IX+10),A
+	LD	A,0
+	ADC	A,(IX+11)
+	LD	(IX+11),A
+	LD	A,0
+	ADC	A,(IX+12)
+	LD	(IX+12),A
+	RET
+IA_RIVAL:
+	LD	A,(0E450h)
+	OR	A
+	JR	z,LB150
+	DEC	A
+	LD	(0E450h),A
+	BIT	0,(IX)
+	JR	nz,LB150
+	CALL	ALEATORIO
+	AND	40h
+	JR	z,LB14D
+	LD	A,0C0h
+LB14D:
+	LD	(IX+4),A
+LB150:
+	BIT	1,(IX)
+	RET	z
+	BIT	2,(IX)
+	JR	nz,LB178
+	DEC	(IX+3)
+	RET	nz
+LB15F:
+	CALL	ALEATORIO
+	AND	0C0h
+	CP	(IX+4)
+	JR	z,LB15F
+	LD	C,A
+	LD	A,(IX)
+	AND	3Fh
+	OR	C
+	LD	(IX),A
+	SET	2,(IX)
+	RET
+LB178:
+	LD	A,(IX)
+	AND	0C0h
+	LD	C,A
+	LD	A,(IX+4)
+	SUB	C
+	JR	z,LB198
+	JR	nc,LB18F
+	LD	A,(IX+4)
+	ADD	A,4
+	LD	(IX+4),A
+	RET
+LB18F:
+	LD	A,(IX+4)
+	SUB	4
+	LD	(IX+4),A
+	RET
+LB198:
+	RES	2,(IX)
+	CALL	ALEATORIO
+	AND	1Fh
+	ADD	A,20h
+	LD	(IX+3),A
+	RET
+LB1A7:
+	PUSH	DE
+	CALL	LB1CA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	LB20C
+	LD	A,H
+	ADD	A,8
+	LD	H,A
+	CP	0FFh
+	JR	c,LB1C3
+	ADD	A,0F0h
+	LD	H,A
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+LB1C3:
+	CALL	LB1EE
+	POP	HL
+	JP	TEXTO_EN
+LB1CA:
+	LD	E,L
+	LD	D,H
+	INC	L
+	INC	L
+	PUSH	HL
+	LD	A,(HL)
+	OR	7Fh
+	LD	(HL),A
+	LD	B,C
+	LD	A,0FFh
+LB1D6:
+	INC	L
+	LD	(HL),A
+	DJNZ	LB1D6
+	INC	L
+	SET	7,(HL)
+	SET	6,(HL)
+	POP	HL
+	INC	H
+	LD	(HL),80h
+	LD	B,C
+	XOR	A
+LB1E5:
+	INC	L
+	LD	(HL),A
+	DJNZ	LB1E5
+	INC	L
+	SET	7,(HL)
+	EX	DE,HL
+	RET
+LB1EE:
+	PUSH	HL
+	SET	0,(HL)
+	LD	B,C
+	XOR	A
+LB1F3:
+	INC	L
+	LD	(HL),A
+	DJNZ	LB1F3
+	INC	L
+	LD	(HL),1
+	POP	HL
+	INC	H
+	SET	0,(HL)
+	SET	1,(HL)
+	LD	B,C
+	DEC	A
+LB202:
+	INC	L
+	LD	(HL),A
+	DJNZ	LB202
+	INC	L
+	LD	A,(HL)
+	OR	0FEh
+	LD	(HL),A
+	RET
+LB20C:
+	PUSH	HL
+	INC	L
+	LD	DE,0E697h
+	EX	DE,HL
+	LD	B,8
+LB214:
+	LD	A,(DE)
+	AND	(HL)
+	INC	L
+	OR	(HL)
+	INC	L
+	LD	(DE),A
+	INC	D
+	DJNZ	LB214
+	LD	A,D
+	SUB	8
+	LD	D,A
+	LD	A,E
+	ADD	A,C
+	INC	A
+	LD	E,A
+	LD	B,8
+LB227:
+	LD	A,(DE)
+	AND	(HL)
+	INC	L
+	OR	(HL)
+	INC	L
+	LD	(DE),A
+	INC	D
+	DJNZ	LB227
+	POP	HL
+	RET
+LB232:
+	LD	A,(0E6B8h)
+	OR	A
+	RET	nz
+	LD	A,(0E424h)
+	OR	A
+	JR	nz,LB245
+	LD	A,(0E6F4h)
+	CP	3
+	JP	z,LB26B
+LB245:
+	LD	HL,0E6BFh
+	LD	DE,0E6B9h
+	LD	BC,6
+	LDIR
+	LD	HL,0
+	XOR	A
+	LD	(0E6C2h),HL
+	LD	(0E6C4h),A
+	LD	A,19h
+	LD	(0E6B8h),A
+	LD	A,4
+	LD	(EFECTO_PEDIDO),A
+	LD	HL,0E6F4h
+	INC	(HL)
+	JP	PINTA_VELOCIMETRO
+LB26B:
+	LD	A,(0E424h)
+	OR	A
+	CALL	z,CLASIFICACION
+	LD	A,0FFh
+	LD	(0E6B8h),A
+	LD	HL,0E6F4h
+	INC	(HL)
+	RET
+MENSAJES_CARRERA:
+	LD	A,(0E6F4h)
+	CP	4
+	JP	z,LB31C
+LB284:
+	DEC	(HL)
+	JR	nz,LB2AD
+	LD	HL,5927h
+	CALL	LB290
+	LD	HL,5967h
+LB290:
+	LD	B,9
+	LD	A,(9EB0h)
+	CALL	ATRIB_A_COLOR
+LB298:
+	PUSH	BC
+	PUSH	HL
+	PUSH	AF
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	AF
+	POP	HL
+	POP	BC
+	INC	L
+	DJNZ	LB298
+	RET
+LB2AD:
+	XOR	A
+	LD	(99E2h),A
+	LD	HL,0F505h
+	LD	C,9
+	LD	DE,2447h
+	CALL	LB1A7
+	LD	HL,0F712h
+	LD	(99A5h),HL
+	LD	DE,0E6B9h
+	CALL	L0BCA
+	LD	HL,0F525h
+	LD	C,9
+	LD	DE,2452h
+	CALL	LB1A7
+	LD	HL,0F732h
+	LD	(99A5h),HL
+	LD	DE,0E6BCh
+	CALL	L0BCA
+	LD	A,77h
+	LD	(99E2h),A
+	LD	HL,5927h
+	CALL	LB2ED
+	LD	HL,5967h
+LB2ED:
+	LD	A,(9EB0h)
+	AND	0F8h
+	OR	2
+	PUSH	HL
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	CALL	ATRIB_A_COLOR
+	LD	BC,28h
+	CALL	VRAM_RELLENA
+	POP	HL
+	LD	A,(9EB0h)
+	XOR	1
+	LD	DE,5
+	ADD	HL,DE
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,20h
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	RET
+LB31C:
+	LD	A,(0E424h)
+	OR	A
+	JP	nz,LB284
+	LD	A,(PUESTO)
+	CP	3
+	JP	nc,LB284
+	XOR	A
+	LD	(99E2h),A
+	LD	HL,0F504h
+	LD	C,11
+	LD	DE,245Dh
+	CALL	LB1A7
+	LD	HL,0F713h
+	LD	(99A5h),HL
+	LD	HL,0E6C5h
+	CALL	L0A23
+	LD	HL,0F524h
+	LD	C,11
+	LD	DE,246Ah
+	CALL	LB1A7
+	LD	HL,0F733h
+	LD	(99A5h),HL
+	LD	HL,0E468h
+	CALL	L0A23
+	LD	A,77h
+	LD	(99E2h),A
+	CALL	LB39D
+	LD	HL,5926h
+	CALL	LB36E
+	LD	HL,5966h
+LB36E:
+	LD	A,(9EB0h)
+	AND	0F8h
+	OR	2
+	PUSH	HL
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	CALL	ATRIB_A_COLOR
+	LD	BC,28h
+	CALL	VRAM_RELLENA
+	POP	HL
+	LD	A,(9EB0h)
+	XOR	1
+	LD	DE,5
+	ADD	HL,DE
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	BC,30h
+	CALL	ATRIB_A_COLOR
+	CALL	VRAM_RELLENA
+	RET
+LB39D:
+	LD	HL,0E6C5h
+	CALL	LB3A6
+	LD	HL,0E468h
+LB3A6:
+	LD	A,(HL)
+	INC	L
+	OR	(HL)
+	JR	z,LB3C5
+	LD	A,(HL)
+	SUB	1
+	DAA
+	LD	(HL),A
+	DEC	L
+	LD	A,(HL)
+	SBC	A,0
+	DAA
+	LD	(HL),A
+	LD	HL,0E420h
+	LD	A,(HL)
+	ADD	A,1
+	DAA
+	LD	(HL),A
+	DEC	L
+	LD	A,(HL)
+	ADC	A,0
+	DAA
+	LD	(HL),A
+	RET
+LB3C5:
+	INC	L
+	INC	L
+	LD	DE,0E422h
+	LD	B,4
+LB3CC:
+	LD	A,(DE)
+	ADD	A,(HL)
+	DAA
+	LD	(DE),A
+	LD	(HL),0
+	DEC	E
+	DEC	L
+	DJNZ	LB3CC
+	RET
+LB3D7:
+	BIT	3,(IX)
+	RET	nz
+	SET	3,(IX)
+	LD	(IX+1),0F4h
+LB3E4:
+	LD	HL,0E44Ch
+	LD	A,(HL)
+	CP	3
+	RET	z
+	INC	A
+	LD	(HL),A
+	CALL	SUMA_A_HL
+	LD	A,12
+	SUB	B
+	LD	(HL),A
+	RET
+LB3F5:
+	LD	A,(0E6E3h)
+	OR	A
+	RET	nz
+	LD	B,12
+	CALL	LB3E4
+	LD	A,(VELOCIDAD)
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	AND	7
+	JR	nz,LB40C
+	INC	A
+LB40C:
+	LD	(0E6E4h),A
+	LD	A,0FFh
+	LD	(0E6E3h),A
+	XOR	A
+	LD	(0E6F5h),A
+	RET
+CARTELES:
+	PUSH	AF
+	POP	AF
+	LD	B,A
+	LD	DE,0E44Dh
+	LD	HL,251Ch
+	LD	IX,0B49Ch
+LB426:
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	LD	A,(DE)
+	CALL	LB43D
+	POP	HL
+	LD	BC,4
+	ADD	HL,BC
+	LD	BC,6
+	ADD	IX,BC
+	POP	DE
+	POP	BC
+	INC	DE
+	DJNZ	LB426
+	RET
+LB43D:
+	PUSH	AF
+	LD	E,(IX+4)
+	LD	D,(IX+5)
+	LD	(99A5h),DE
+	CALL	TEXTO_GRANDE
+	LD	E,(IX+2)
+	LD	D,(IX+3)
+	LD	HL,9378h
+	LD	B,18h
+	DI
+	CALL	FIGURA_MASCARA_ANCHA
+	EI
+	POP	AF
+	OR	A
+	JR	nz,LB46F
+	LD	HL,0B49Bh
+	INC	(HL)
+	LD	A,(HL)
+	AND	4
+	LD	A,0
+	JR	z,LB46F
+	LD	HL,126Fh
+	JR	LB48D
+LB46F:
+	ADD	A,12
+	LD	E,A
+	LD	D,0E4h
+	LD	A,(DE)
+	LD	H,A
+	LD	L,0
+	SRL	H
+	RR	L
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	LD	B,0
+	JR	z,LB485
+	DEC	B
+LB485:
+	NEG
+	LD	C,A
+	ADD	HL,BC
+	LD	BC,12DFh
+	ADD	HL,BC
+LB48D:
+	LD	E,(IX)
+	LD	D,(IX+1)
+	LD	B,14
+	DI
+	CALL	FIGURA_MASCARA_1
+	EI
+	RET
+	DS 16,RELLENO
+	DS 3,RELLENO
+LB4AE:
+	LD	E,A
+	XOR	A
+	RL	E
+	JR	nc,LB4B6
+	ADD	A,C
+	ADD	A,A
+LB4B6:
+	RL	E
+	JR	nc,LB4BB
+	ADD	A,C
+LB4BB:
+	ADD	A,A
+	RL	E
+	RET	nc
+	ADD	A,C
+	RET
+LB4C1:
+	LD	E,0
+	OR	A
+	JP	p,LB4CA
+	NEG
+	DEC	E
+LB4CA:
+	CALL	LB4E8
+	INC	E
+	RET	nz
+	NEG
+	RET
+LB4D2:
+	LD	E,0
+	OR	A
+	JP	p,LB4DB
+	NEG
+	DEC	E
+LB4DB:
+	CALL	LB4E8
+	INC	E
+	RET	nz
+	LD	A,L
+	CPL
+	LD	L,A
+	LD	A,H
+	CPL
+	LD	H,A
+	INC	HL
+	RET
+LB4E8:
+	LD	L,0
+	LD	B,L
+	ADD	A,A
+	LD	H,A
+	JR	nc,LB4F0
+	LD	L,C
+LB4F0:
+	ADD	HL,HL
+	JR	nc,LB4F4
+	ADD	HL,BC
+LB4F4:
+	ADD	HL,HL
+	JR	nc,LB4F8
+	ADD	HL,BC
+LB4F8:
+	ADD	HL,HL
+	JR	nc,LB4FC
+	ADD	HL,BC
+LB4FC:
+	ADD	HL,HL
+	JR	nc,LB500
+	ADD	HL,BC
+LB500:
+	ADD	HL,HL
+	JR	nc,LB504
+	ADD	HL,BC
+LB504:
+	ADD	HL,HL
+	JR	nc,LB508
+	ADD	HL,BC
+LB508:
+	ADD	HL,HL
+	JR	nc,LB50C
+	ADD	HL,BC
+LB50C:
+	LD	A,H
+	RET
+LB50E:
+	PUSH	BC
+	RLCA
+	RLCA
+	RLCA
+	AND	7
+	JR	nz,LB518
+	LD	A,8
+LB518:
+	LD	C,A
+	LD	B,8
+	XOR	A
+LB51C:
+	RL	E
+	RLA
+	SUB	C
+	JR	nc,LB523
+	ADD	A,C
+LB523:
+	DJNZ	LB51C
+	LD	B,A
+	LD	A,E
+	RLA
+	CPL
+	POP	BC
+	RET
+CUENTA_FIN:
+	LD	A,(0E5E0h)
+	OR	A
+	JR	z,LB53B
+	DEC	A
+	LD	(0E5E0h),A
+	RET	nz
+	DEC	A
+	LD	(0E6E5h),A
+	RET
+LB53B:
+	LD	A,(0E44Ch)
+	CP	3
+	JR	c,LB552
+	LD	HL,(0E6C5h)
+	LD	A,H
+LB546:
+	OR	L
+	RET	nz
+	XOR	A
+	LD	(0E6F5h),A
+	LD	A,1Eh
+	LD	(0E5E0h),A
+	RET
+LB552:
+	LD	A,(0E6E3h)
+	OR	A
+	RET	z
+	LD	HL,(0E6C5h)
+	LD	A,(VELOCIDAD)
+	OR	H
+	JR	LB546
+PANTALLA_ETAPA:
+	CALL	LETRAS_PEQUENAS
+	LD	A,46h
+	CALL	BORRA_PANTALLA
+	LD	HL,2477h
+	CALL	POSICION_TEXTO
+	CALL	POSICION_TEXTO
+	CALL	L109C
+ESPERA_2S:
+	LD	B,64h
+LB576:
+	EI
+	HALT
+	DI
+	DJNZ	LB576
+	JP	LETRAS_NORMALES
+ESPERA_TECLA:
+	LD	B,0
+LB580:
+	EI
+	HALT
+	DI
+	CALL	LEE_CONTROLES
+	RRA
+	JP	c,LETRAS_NORMALES
+	DJNZ	LB580
+	JP	LETRAS_NORMALES
+PUNTOS_A_CERO:
+	LD	HL,0E41Ch
+LB592:
+	XOR	A
+	LD	(HL),A
+	INC	L
+	LD	A,L
+	CP	34h
+	JR	nz,LB592
+	LD	A,6
+	LD	(CREDITOS),A
+	LD	HL,0E425h
+	LD	DE,0E426h
+	LD	BC,5
+	LD	(HL),0FFh
+	LDIR
+	RET
+
+;----------------------------------------------------------------------
+; CONTINUAR: TO CONTINUE / YES / NO.
+;----------------------------------------------------------------------
+CONTINUAR:
+	LD	A,(CREDITOS)
+	OR	A
+	RET	z
+	CALL	LETRAS_PEQUENAS
+	LD	A,47h
+	CALL	BORRA_PANTALLA
+	LD	HL,2001h
+	LD	(0E45Eh),HL
+	LD	HL,2499h
+	CALL	POSICION_TEXTO
+	CALL	POSICION_TEXTO
+	CALL	L109C
+	LD	C,0
+LB5CE:
+	CALL	LB5F4
+	CALL	LB639
+	JR	c,LB5E9
+	CALL	LEE_CONTROLES
+	AND	19h
+	JR	z,LB5CE
+	RRA
+	JR	c,LB5E9
+	AND	8
+	LD	C,0FFh
+	JR	nz,LB5CE
+	INC	C
+	JR	LB5CE
+LB5E9:
+	RRC	C
+	RET	nc
+	LD	A,0FFh
+	LD	(0E424h),A
+	JP	LETRAS_NORMALES
+LB5F4:
+	LD	HL,598Ah
+	LD	A,47h
+	RRC	C
+	JR	nc,LB5FF
+	LD	A,78h
+LB5FF:
+	LD	B,5
+	CALL	LB611
+	LD	HL,5992h
+	LD	A,47h
+	RRC	C
+	JR	c,LB60F
+	LD	A,78h
+LB60F:
+	LD	B,4
+LB611:
+	PUSH	BC
+	LD	C,2
+	CALL	ATRIB_A_COLOR
+LB617:
+	PUSH	BC
+	PUSH	HL
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+LB61E:
+	PUSH	AF
+	PUSH	BC
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	LD	BC,8
+	ADD	HL,BC
+	POP	BC
+	POP	AF
+	DJNZ	LB61E
+	POP	HL
+	LD	BC,20h
+	ADD	HL,BC
+	POP	BC
+	DEC	C
+	JR	nz,LB617
+	POP	BC
+	RET
+LB639:
+	EI
+	HALT
+	DI
+	LD	HL,0E45Eh
+	OR	A
+	DEC	(HL)
+	RET	nz
+	LD	(HL),19h
+	INC	L
+	LD	A,(HL)
+	SUB	1
+	DAA
+	RET	c
+	LD	(HL),A
+	LD	HL,504Fh
+	LD	(99A5h),HL
+	PUSH	BC
+	CALL	PINTA_BCD
+	POP	BC
+	OR	A
+	RET
+RECORDS:
+	CALL	MIRA_RECORD
+	RET	nc
+	CALL	PIDE_INICIALES
+	SCF
+	RET
+
+;----------------------------------------------------------------------
+; TABLA_RECORDS: Tabla de récords.
+;----------------------------------------------------------------------
+TABLA_RECORDS:
+	CALL	LB6AF
+	XOR	A
+	LD	(99E2h),A
+	CALL	BORRA_PANTALLA
+	CALL	LIMPIA_BUFER
+	LD	HL,0BC9Ah
+	CALL	POSICION_TEXTO
+	LD	HL,0EF40h
+	LD	(99A5h),HL
+	LD	HL,26B8h
+	LD	A,47h
+	LD	(99CCh),A
+	CALL	LB6E9
+	LD	DE,5800h
+	LD	HL,26A6h
+	CALL	LB6F3
+	LD	HL,26A9h
+	LD	DE,5900h
+	LD	B,10h
+LB696:
+	PUSH	BC
+	PUSH	HL
+	CALL	LB6F3
+	POP	HL
+	POP	BC
+	DJNZ	LB696
+	CALL	LB72F
+	CALL	LB7B8
+	CALL	LB902
+	DI
+	LD	A,77h
+	LD	(99E2h),A
+	RET
+LB6AF:
+	LD	HL,0A0EDh
+	LD	(0EB00h),HL
+	LD	HL,0EB00h
+	LD	DE,0EB02h
+	LD	BC,3Eh
+	LDIR
+	LD	A,0C9h
+	LD	(DE),A
+	LD	HL,0A8EDh
+	LD	(0EB41h),HL
+	LD	HL,0EB41h
+	LD	DE,0EB43h
+	LD	BC,38h
+	LDIR
+	LD	A,0C9h
+	LD	(DE),A
+	RET
+LB6D8:
+	PUSH	BC
+	PUSH	HL
+LB6DA:
+	LD	A,(DE)
+	LD	(HL),A
+	INC	L
+	INC	DE
+	DJNZ	LB6DA
+	POP	HL
+	CALL	BUFER_BAJA
+	POP	BC
+	DEC	C
+	JR	nz,LB6D8
+	RET
+LB6E9:
+	LD	A,(HL)
+	CP	0FFh
+	INC	HL
+	RET	z
+	CALL	PINTA_LETRA
+	JR	LB6E9
+LB6F3:
+	LD	A,(HL)
+	CP	0FFh
+	RET	z
+	LD	B,A
+	INC	HL
+	LD	A,(HL)
+	INC	HL
+	PUSH	BC
+	PUSH	HL
+	PUSH	DE
+	CALL	ATRIB_A_COLOR
+	EX	AF,AF'
+	LD	A,B
+	AND	A
+	JR	z,LB71E
+	LD	L,B
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	C,L
+	LD	B,H
+LB70E:
+	EX	AF,AF'
+	CALL	DIR_COLOR
+	EX	DE,HL
+	CALL	VRAM_RELLENA
+	POP	DE
+	POP	HL
+	POP	BC
+LB719:
+	INC	DE
+	DJNZ	LB719
+	JR	LB6F3
+LB71E:
+	LD	BC,0800h
+	JR	LB70E
+BUFER_BAJA:
+	INC	H
+	LD	A,H
+	CP	0FFh
+	RET	nz
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	H,0EFh
+	RET
+LB72F:
+	LD	HL,0F740h
+	LD	DE,0
+	LD	B,1Dh
+LB737:
+	CALL	LB989
+	CALL	LB746
+	CALL	LB7AC
+	CALL	LB7AC
+	DJNZ	LB737
+	RET
+LB746:
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	EX	DE,HL
+	CALL	VRAM_ESCRIBE_EN
+	EX	DE,HL
+	LD	B,7
+LB750:
+	PUSH	BC
+	PUSH	HL
+	LD	B,20h
+LB754:
+	PUSH	HL
+	LD	DE,20h
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	CALL	BUFER_BAJA
+	POP	HL
+	INC	HL
+	DJNZ	LB754
+	POP	HL
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	CALL	BUFER_BAJA
+	POP	BC
+	DJNZ	LB750
+	POP	BC
+	POP	DE
+	POP	HL
+	RET
+LB7AC:
+	LD	A,H
+	DEC	H
+	CP	0EFh
+	RET	nz
+	LD	A,L
+	SUB	20h
+	LD	L,A
+	LD	H,0FEh
+	RET
+LB7B8:
+	CALL	LIMPIA_BUFER
+	LD	HL,MUSICA_PRESENTACION
+	LD	DE,593Bh
+	LD	IX,257Ah
+	LD	B,10
+LB7C7:
+	PUSH	BC
+	PUSH	HL
+	PUSH	DE
+	LD	(0E464h),DE
+	LD	(99A5h),HL
+	LD	A,10
+	SUB	B
+	CP	9
+	LD	C,A
+	LD	A,20h
+	JR	nz,LB7DF
+	LD	A,31h
+	LD	C,0FFh
+LB7DF:
+	CALL	PINTA_LETRA
+	LD	A,C
+	ADD	A,31h
+	CALL	PINTA_LETRA
+	CALL	LB80A
+	CALL	LB831
+	CALL	LB851
+	CALL	LB867
+	CALL	LB883
+	LD	DE,14
+	ADD	IX,DE
+	POP	HL
+	LD	DE,20h
+	ADD	HL,DE
+	EX	DE,HL
+	POP	HL
+	CALL	LB8C6
+	POP	BC
+	DJNZ	LB7C7
+	RET
+LB80A:
+	LD	A,(IX+4)
+	RRCA
+	RRCA
+	RRCA
+	LD	HL,2606h
+	CALL	SUMA_A_HL
+	LD	DE,(99A5h)
+	EX	DE,HL
+	LD	BC,0408h
+	CALL	LB6D8
+	LD	A,(99A5h)
+	ADD	A,4
+	LD	(99A5h),A
+	LD	A,(IX+4)
+	ADD	A,41h
+	JP	PINTA_LETRA
+LB831:
+	LD	HL,99A5h
+	INC	(HL)
+	LD	A,(IX+5)
+	CALL	PINTA_CIFRA
+	LD	A,27h
+	CALL	PINTA_LETRA
+	LD	A,(IX+6)
+	CALL	PINTA_BCD
+	LD	A,2Eh
+	CALL	PINTA_LETRA
+	LD	A,(IX+7)
+	JP	L0BE9
+LB851:
+	LD	HL,99A5h
+	INC	(HL)
+	LD	A,(IX+8)
+	CALL	PINTA_LETRA
+	LD	A,(IX+9)
+	CALL	PINTA_LETRA
+	LD	A,(IX+10)
+	JP	PINTA_LETRA
+LB867:
+	LD	HL,99A5h
+	INC	(HL)
+	LD	A,(IX)
+	CALL	PINTA_CIFRA
+	LD	A,(IX+1)
+	CALL	PINTA_BCD
+	LD	A,(IX+2)
+	CALL	PINTA_BCD
+	LD	A,(IX+3)
+	JP	PINTA_BCD
+LB883:
+	LD	HL,99A5h
+	INC	(HL)
+	LD	A,(IX+11)
+	CALL	LB899
+	LD	A,(IX+12)
+	CALL	LB899
+	LD	A,(IX+13)
+	JP	LB8C0
+LB899:
+	PUSH	AF
+	CALL	LB8C0
+	POP	AF
+LB89E:
+	AND	15
+	CALL	LB8D3
+	CP	12
+	JR	c,LB8AC
+	LD	A,20h
+	JP	PINTA_LETRA
+LB8AC:
+	CP	3
+	JR	nc,LB8B5
+	LD	A,7Fh
+	JP	PINTA_LETRA
+LB8B5:
+	INC	A
+	CP	10
+	JP	c,PINTA_CIFRA
+	ADD	A,78h
+	JP	PINTA_LETRA
+LB8C0:
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	JR	LB89E
+LB8C6:
+	PUSH	DE
+	LD	DE,20h
+	ADD	HL,DE
+	POP	DE
+	LD	A,H
+	CP	0F0h
+	RET	nz
+	LD	H,0F7h
+	RET
+LB8D3:
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	PUSH	AF
+	LD	C,7
+	DEC	A
+	JR	z,LB8E3
+	LD	C,42h
+	DEC	A
+	JR	z,LB8E3
+	LD	C,46h
+LB8E3:
+	LD	HL,(0E464h)
+	INC	HL
+	LD	(0E464h),HL
+	DEC	HL
+	EX	DE,HL
+	CALL	DIR_COLOR
+	EX	DE,HL
+	LD	A,C
+	CALL	ATRIB_A_COLOR
+	LD	BC,8
+	CALL	VRAM_RELLENA
+	POP	AF
+	POP	BC
+	POP	DE
+	POP	HL
+	LD	HL,(0E464h)
+	RET
+LB902:
+	CALL	LB95A
+	LD	HL,MUSICA_PRESENTACION
+	LD	DE,0800h
+	EX	DE,HL
+	CALL	VRAM_ESCRIBE_EN
+	EX	DE,HL
+	LD	B,8
+	CALL	LB926
+	LD	HL,0F700h
+	LD	DE,1000h
+	EX	DE,HL
+	CALL	VRAM_ESCRIBE_EN
+	EX	DE,HL
+	LD	B,2
+	CALL	LB926
+	RET
+LB926:
+	PUSH	BC
+	LD	B,20h
+LB929:
+	LD	DE,0100h
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	A,(HL)
+	OUT	(98h),A	; VDP: datos
+	ADD	HL,DE
+	LD	DE,0F801h
+	ADD	HL,DE
+	DJNZ	LB929
+	LD	DE,0
+	ADD	HL,DE
+	POP	BC
+	DJNZ	LB926
+	RET
+LB95A:
+	LD	B,5
+	LD	IX,26D9h
+LB960:
+	PUSH	BC
+	LD	L,(IX)
+	LD	H,(IX+1)
+	LD	B,(IX+2)
+	LD	A,(IX+3)
+	CALL	ATRIB_A_COLOR
+	EX	DE,HL
+	CALL	DIR_COLOR
+	LD	L,B
+	LD	H,0
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	LD	C,L
+	LD	B,H
+	EX	DE,HL
+	CALL	VRAM_RELLENA
+	LD	BC,7
+	ADD	IX,BC
+	POP	BC
+	DJNZ	LB960
+	RET
+LB989:
+	EI
+	HALT
+	DI
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	LD	HL,0
+	LD	DE,0
+	LD	BC,0300h
+	LDIR
+	POP	HL
+	POP	DE
+	POP	BC
+	RET
+
+;----------------------------------------------------------------------
+; LIMPIA_BUFER: Pone a 0 el búfer EF00h-FEFFh.
+;----------------------------------------------------------------------
+LIMPIA_BUFER:
+	PUSH	BC
+	LD	HL,MUSICA_PRESENTACION
+	LD	BC,1000h
+LB9A5:
+	LD	(HL),0
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	nz,LB9A5
+	POP	BC
+	RET
+LB9AF:
+	INC	HL
+	INC	HL
+	LD	A,E
+	AND	4
+	RRA
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	CALL	BUFER_DIR
+	LD	A,E
+	AND	1Fh
+	LD	(0B9D2h),A
+	LD	A,E
+	AND	0E0h
+	LD	E,A
+	LD	A,B
+	CP	(HL)
+	JP	m,LB9D1
+	LD	B,(HL)
+LB9D1:
+	LD	A,0
+	INC	HL
+	ADD	A,(HL)
+	SUB	20h
+	JP	z,LA7D9
+	JP	c,LA7D9
+	LD	(0BA4Bh),A
+	SUB	(HL)
+	NEG
+	ADD	A,A
+	LD	(0BA4Eh),A
+	INC	HL
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	JP	LB9FD
+LB9F0:
+	INC	A
+	LD	C,A
+	LD	A,(HL)
+	INC	HL
+	SUB	C
+	LD	(0BA4Bh),A
+	LD	A,C
+	ADD	A,A
+	LD	(0BA4Eh),A
+LB9FD:
+	PUSH	BC
+	PUSH	HL
+	LD	A,(0BA4Bh)
+	LD	C,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,A
+	NEG
+	LD	C,A
+	LD	B,0FFh
+	LD	HL,0BA49h
+	ADD	HL,BC
+	LD	(0BA1Dh),HL
+	LD	(0BA60h),HL
+	POP	HL
+	POP	BC
+	LD	(0BA63h),SP
+	LD	SP,HL
+LBA1C:
+	JP	LBA1C
+	DS 12,RELLENO
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	POP	HL
+	LD	A,(DE)
+	AND	L
+	OR	H
+	LD	(DE),A
+	INC	E
+	LD	A,E
+	SUB	0
+	LD	E,A
+	LD	HL,0
+	ADD	HL,SP
+	LD	SP,HL
+	INC	D
+	INC	D
+	JP	nz,LBA5D
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0F0h
+LBA5D:
+	DEC	D
+	DEC	B
+LBA5F:
+	JP	nz,LBA5F
+	LD	SP,0
+	EXX
+	RET
+CLASIFICACION:
+	LD	A,(ETAPA)
+	ADD	A,A
+	DAA
+	LD	C,A
+	LD	HL,PUESTO
+	LD	A,3
+	SUB	(HL)
+	ADD	A,C
+	DAA
+	LD	C,A
+	LD	HL,0E6C5h
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	LD	C,A
+	AND	15
+	LD	(HL),A
+	INC	L
+	LD	A,C
+	AND	0F0h
+	LD	(HL),A
+	LD	HL,0E6C1h
+	LD	DE,0BAD3h
+	LD	BC,0E46Bh
+	LD	A,(DE)
+	SBC	A,(HL)
+	DAA
+	LD	(BC),A
+	DEC	HL
+	DEC	BC
+	DEC	DE
+	LD	A,(DE)
+	SBC	A,(HL)
+	DAA
+	JR	nc,LBA9E
+	SUB	40h
+	SCF
+LBA9E:
+	LD	(BC),A
+	DEC	HL
+	DEC	BC
+	DEC	DE
+	LD	A,(DE)
+	SBC	A,(HL)
+	DAA
+	LD	(BC),A
+	DEC	BC
+	LD	A,0
+	LD	(BC),A
+	JR	nc,LBAB5
+	LD	HL,0
+	LD	(0E468h),HL
+	LD	(0E46Ah),HL
+LBAB5:
+	LD	HL,(0E46Ah)
+	LD	B,6
+	LD	C,0
+LBABC:
+	LD	A,H
+	ADD	A,A
+	DAA
+	LD	H,A
+	LD	A,L
+	ADC	A,A
+	DAA
+	LD	L,A
+	LD	A,C
+	ADC	A,A
+	DAA
+	LD	C,A
+	DJNZ	LBABC
+	LD	(0E469h),A
+	LD	(0E46Ah),HL
+	RET
+	DS 3,RELLENO
+LBAD4:
+	EXX
+	LD	C,A
+	LD	L,(IX)
+	LD	H,(IX+1)
+	XOR	A
+	LD	(0BB35h),A
+	LD	A,23h
+	LD	(0BB1Fh),A
+	JP	LBAFB
+LBAE8:
+	EXX
+	LD	C,A
+	LD	L,(IX)
+	LD	H,(IX+1)
+	INC	H
+	INC	H
+	LD	A,23h
+	LD	(0BB35h),A
+	XOR	A
+	LD	(0BB1Fh),A
+LBAFB:
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	LD	A,C
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	SUB	C
+	LD	C,A
+	LD	A,(0E454h)
+	AND	0FEh
+	LD	(0BB0Dh),A
+	LD	HL,(0E500h)
+	LD	B,0
+	ADD	HL,BC
+	LD	A,(IY+1)
+	SUB	(HL)
+	JP	m,LA7D9
+	LD	C,A
+	LD	A,80h
+	SUB	C
+	LD	B,A
+	INC	HL
+	NOP
+	PUSH	BC
+	LD	C,(HL)
+	LD	A,C
+	RLA
+	SBC	A,A
+	LD	B,A
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	POP	BC
+	LD	A,D
+	OR	A
+	JP	nz,LA7D9
+	LD	A,E
+	CP	0F8h
+	JP	nc,LA7D9
+	INC	HL
+	INC	HL
+	AND	4
+	RRA
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	A,C
+	AND	15
+	ADD	A,0EFh
+	LD	D,A
+	LD	A,E
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	XOR	C
+	AND	8Fh
+	XOR	C
+	RLCA
+	LD	E,A
+	LD	B,(HL)
+	INC	HL
+	LD	A,(HL)
+	INC	HL
+	PUSH	HL
+	LD	HL,FIGURA_MASCARA_2
+	DEC	A
+	JR	z,LBB62
+	LD	HL,0A7DBh
+LBB62:
+	LD	(0BB6Eh),HL
+	LD	(0BB7Ch),HL
+	LD	(0BB84h),HL
+	POP	HL
+	PUSH	BC
+	CALL	FIGURA_MASCARA_2
+	EXX
+	LD	(0BB78h),HL
+	POP	BC
+	LD	C,8
+LBB77:
+	LD	HL,0
+	PUSH	BC
+	CALL	FIGURA_MASCARA_2
+	EXX
+	POP	BC
+	DEC	C
+	JR	nz,LBB77
+	JP	FIGURA_MASCARA_2
+
+;----------------------------------------------------------------------
+; PODIO: Final de circuito: podio y CONGRATULATIONS.
+;----------------------------------------------------------------------
+PODIO:
+	CALL	LIMPIA_BUFER
+	LD	HL,9378h
+	LD	BC,0618h
+	LD	DE,0F16Ah
+	CALL	LBC40
+	LD	A,(0E40Ch)
+	LD	H,A
+	LD	L,0
+	SRL	H
+	RR	L
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	LD	B,0
+	JR	z,LBBA8
+	DEC	B
+LBBA8:
+	NEG
+	LD	C,A
+	ADD	HL,BC
+	LD	BC,12DFh
+	ADD	HL,BC
+	LD	BC,040Eh
+	LD	DE,0EF4Ch
+	CALL	LBC40
+	CALL	VUELCA_BUFER
+	LD	HL,0BC1Eh
+	LD	(0BC3Eh),HL
+	CALL	LETRAS_PEQUENAS
+	LD	B,14h
+LBBC7:
+	EI
+	HALT
+	DI
+	LD	HL,4821h
+	LD	(99A5h),HL
+	LD	HL,(0BC3Eh)
+	DEC	HL
+	LD	(0BC3Eh),HL
+	CALL	TEXTO_GRANDE
+	DJNZ	LBBC7
+	LD	B,16h
+	LD	HL,50BEh
+	LD	(0BC3Eh),HL
+	LD	C,1
+LBBE6:
+	PUSH	BC
+	EI
+	HALT
+	DI
+	LD	HL,(0BC3Eh)
+	LD	(99A5h),HL
+	DEC	HL
+	LD	(0BC3Eh),HL
+	LD	HL,0BC1Eh
+	LD	B,C
+LBBF8:
+	LD	A,(HL)
+	INC	HL
+	CALL	PINTA_LETRA_GRANDE
+	DJNZ	LBBF8
+	POP	BC
+	INC	C
+	DJNZ	LBBE6
+LBC03:
+	CALL	LEE_CONTROLES
+	RRA
+	JR	nc,LBC03
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 6,RELLENO
+LBC40:
+	PUSH	BC
+	PUSH	DE
+LBC42:
+	CALL	LBC53
+	DJNZ	LBC42
+	EX	DE,HL
+	POP	HL
+	INC	H
+	CALL	BUFER_BAJA
+	EX	DE,HL
+	POP	BC
+	DEC	C
+	JR	nz,LBC40
+	RET
+LBC53:
+	PUSH	BC
+	LD	C,(HL)
+	INC	HL
+	LD	B,(HL)
+	INC	HL
+	CALL	LBC5D
+	POP	BC
+	RET
+LBC5D:
+	PUSH	HL
+	LD	A,C
+	CALL	LBC8A
+	LD	A,(DE)
+	AND	H
+	LD	(DE),A
+	INC	DE
+	LD	A,(DE)
+	AND	L
+	LD	(DE),A
+	INC	D
+	LD	A,(DE)
+	AND	L
+	LD	(DE),A
+	DEC	DE
+	LD	A,(DE)
+	AND	H
+	LD	(DE),A
+	DEC	D
+	LD	A,B
+	CALL	LBC8A
+	LD	A,(DE)
+	OR	H
+	LD	(DE),A
+	INC	DE
+	LD	A,(DE)
+	OR	L
+	LD	(DE),A
+	INC	D
+	LD	A,(DE)
+	OR	L
+	LD	(DE),A
+	DEC	DE
+	LD	A,(DE)
+	OR	H
+	LD	(DE),A
+	DEC	D
+	INC	DE
+	INC	DE
+	POP	HL
+	RET
+LBC8A:
+	PUSH	BC
+	LD	B,8
+LBC8D:
+	RRA
+	RR	H
+	RR	L
+	SRA	H
+	RR	L
+	DJNZ	LBC8D
+	POP	BC
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 8,RELLENO
+
+;----------------------------------------------------------------------
+; LEE_CONTROLES: Lee las teclas definidas (tabla en BD0Ah) y, si se eligió joystick,
+; también LEE_JOYSTICK. Devuelve bits en A.
+;----------------------------------------------------------------------
+LEE_CONTROLES:
+	EXX
+	LD	HL,0BD0Ah
+	LD	E,1
+LBCC8:
+	LD	A,E
+	AND	20h
+	JR	z,LBCCF
+	LD	C,0FEh
+LBCCF:
+	LD	A,(HL)
+	OUT	(0AAh),A	; PPI: fila de teclado / motor cinta
+	INC	HL
+	IN	A,(0A9h)	; PPI: teclado (columnas)
+	CPL
+	AND	(HL)
+	INC	HL
+	JR	z,LBCDB
+	SCF
+LBCDB:
+	RL	E
+	JR	nc,LBCC8
+	LD	A,E
+	RRCA
+	RRCA
+	RRCA
+	LD	E,A
+	LD	A,(TECLAS_DEFINIDAS)
+	AND	A
+	CALL	z,LBCFE
+	LD	A,E
+	AND	1
+	LD	HL,BOTON_ANTERIOR
+	CP	(HL)
+	JR	nz,LBCF8
+	RES	0,E
+	JR	LBCFB
+LBCF8:
+	LD	(BOTON_ANTERIOR),A
+LBCFB:
+	LD	A,E
+	EXX
+	RET
+LBCFE:
+	LD	A,E
+	AND	0E0h
+	PUSH	AF
+	CALL	LEE_JOYSTICK
+	POP	AF
+	OR	E
+	LD	E,A
+	RET
+TECLAS_DEFINIDAS:
+	DS 16,RELLENO
+	DS 1,RELLENO
+LBD1A:
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	LDI
+	RET
+ORDEN_SALIDA:
+	LD	HL,0E6CBh
+	XOR	A
+	LD	B,12
+LBD2D:
+	LD	(HL),A
+	INC	L
+	INC	A
+	CP	12
+	JR	nz,LBD2D
+	XOR	A
+LBD35:
+	LD	(HL),A
+	INC	L
+	DJNZ	LBD35
+	LD	DE,0E40Ch
+	LD	A,(PILOTO)
+	LD	(DE),A
+	LD	C,A
+	CALL	LAF98
+	LD	B,11
+LBD46:
+	INC	E
+LBD47:
+	CALL	ALEATORIO
+	AND	15
+	CP	12
+	JR	nc,LBD47
+	LD	C,A
+	CALL	LAF8D
+	JR	c,LBD47
+	CALL	LAF98
+	LD	A,C
+	LD	(DE),A
+	DJNZ	LBD46
+	LD	A,0FFh
+	LD	(0E435h),A
+	RET
+LBD63:
+	LD	A,(HL)
+	CP	5
+	RET	nz
+	EXX
+	XOR	A
+	LD	(0BDBCh),A
+	LD	A,23h
+	LD	(0BDA0h),A
+	LD	L,(IX)
+	LD	H,(IX+1)
+	INC	H
+	INC	H
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	LD	A,(0E454h)
+	SRL	A
+	LD	C,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,A
+	ADD	A,C
+	LD	C,A
+	LD	B,0
+	LD	HL,0BDF2h
+	ADD	HL,BC
+	LD	A,(IY+1)
+	SUB	(HL)
+	JP	m,LA7D9
+	LD	C,A
+	LD	A,80h
+	SUB	C
+	CP	(HL)
+	JP	m,LBD9E
+	LD	A,(HL)
+LBD9E:
+	LD	B,A
+	INC	HL
+	INC	HL
+	PUSH	BC
+	LD	C,(HL)
+	LD	A,C
+	RLA
+	SBC	A,A
+	LD	B,A
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	POP	BC
+	LD	A,D
+	INC	A
+	JP	z,LA7D9
+	CP	2
+	JP	nc,LA7D9
+	LD	A,E
+	CP	0F8h
+	JP	nc,LA7D9
+	INC	HL
+	INC	HL
+	AND	4
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	CALL	BUFER_DIR
+	PUSH	IX
+	DS 2,RELLENO	; LD	IXL,B
+	LD	C,(HL)
+	INC	HL
+	LD	B,(HL)
+	INC	HL
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+LBDD3:
+	LD	A,(DE)
+	AND	B
+	OR	C
+	LD	(DE),A
+	INC	E
+	LD	A,(DE)
+	AND	H
+	OR	L
+	LD	(DE),A
+	DEC	E
+	INC	D
+	INC	D
+	JP	nz,LBDE8
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0F0h
+LBDE8:
+	DEC	D
+	DS 2,RELLENO	; DEC	IXL
+	JP	nz,LBDD3
+	POP	IX
+	EXX
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 9,RELLENO
+PREPARA_CARRERA:
+	LD	HL,PUESTO
+	XOR	A
+LBEBF:
+	LD	(HL),A
+	INC	L
+	JR	nz,LBEBF
+	LD	HL,0E6B8h
+LBEC6:
+	LD	(HL),A
+	INC	L
+	JR	nz,LBEC6
+	LD	A,1
+	LD	(0E6E6h),A
+	LD	(0E6E8h),A
+	LD	(0E6ECh),A
+	LD	A,80h
+	LD	(0E46Fh),A
+	LD	(0E680h),A
+	LD	HL,0E0h
+	LD	(0E43Ch),HL
+	LD	A,0F0h
+	LD	(0E449h),A
+	CALL	ORDEN_SALIDA
+	LD	HL,0EA00h
+	LD	DE,0EA01h
+	LD	BC,0FFh
+	LD	(HL),0
+	LDIR
+	LD	A,(ETAPA)
+	ADD	A,A
+	LD	HL,0C4B4h
+	CALL	SUMA_A_HL
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	E,(HL)
+	INC	HL
+	LD	D,(HL)
+	INC	HL
+	LD	(0E441h),DE
+	LD	A,(HL)
+	INC	HL
+	LD	(0E43Eh),A
+	LD	E,(HL)
+	LD	D,0
+	LD	(0E6F2h),DE
+	LD	(0E466h),DE
+	INC	HL
+	LD	A,(HL)
+	LD	(0E433h),A
+	INC	HL
+	PUSH	HL
+	LD	DE,0E49Ch
+	LD	BC,10
+	LDIR
+	POP	HL
+	LD	BC,10
+	LDIR
+	LD	A,(HL)
+	LD	E,A
+	LD	D,A
+	LD	(0E4B0h),DE
+	INC	HL
+	LD	A,(HL)
+	LD	E,A
+	LD	D,A
+	LD	(9EB0h),DE
+	INC	HL
+	LD	(08FBh),HL
+	LD	HL,0EAE0h
+	LD	(0E6F0h),HL
+	LD	B,28h
+LBF4E:
+	PUSH	BC
+	CALL	CURVA_ACTUAL
+	POP	BC
+	DJNZ	LBF4E
+	LD	HL,0EA08h
+	LD	(0E6F0h),HL
+	LD	A,L
+	LD	(0E522h),A
+	CALL	PREPARA_RIVALES
+	CALL	AVANZA_PISTA
+	CALL	CALCULA_BORDES
+	CALL	PINTA_SUELO
+	CALL	LEE_CURVA
+	CALL	PINTA_PISTA
+	CALL	MUEVE_RIVALES
+	CALL	PINTA_RIVALES
+	CALL	PINTA_JUGADOR
+	CALL	ORDENA_CARRERA
+	CALL	PINTA_MARCADOR_FIJO
+	JP	VUELCA_BUFER
+LBF83:
+	CP	6
+	JP	z,LBAD4
+	CP	9
+	RET	nc
+	EXX
+	LD	C,A
+	LD	L,(IX)
+	LD	H,(IX+1)
+	XOR	A
+	LD	(0C001h),A
+	LD	(LB9AF),A
+	LD	A,23h
+	LD	(0BFE6h),A
+	JP	LBFC2
+LBFA2:
+	CP	6
+	JP	z,LBAE8
+	CP	9
+	JP	nc,LAD5A
+	EXX
+	LD	C,A
+	LD	L,(IX)
+	LD	H,(IX+1)
+	INC	H
+	INC	H
+	LD	A,23h
+	LD	(0C001h),A
+	LD	(LB9AF),A
+	XOR	A
+	LD	(0BFE6h),A
+LBFC2:
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	LD	A,C
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	SUB	C
+	LD	C,A
+	LD	A,(0E454h)
+	AND	0FEh
+	LD	(0BFD4h),A
+	LD	HL,(0E500h)
+	LD	B,0
+	ADD	HL,BC
+	LD	A,(IY+1)
+	SUB	(HL)
+	JP	m,LA7D9
+LBFE0:
+	LD	C,A
+	LD	A,80h
+	SUB	C
+	LD	B,A
+	INC	HL
+	NOP
+	PUSH	BC
+	LD	C,(HL)
+	LD	A,C
+	RLA
+	SBC	A,A
+	LD	B,A
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	POP	BC
+	LD	A,D
+	INC	A
+	JP	z,LB9AF
+	CP	2
+	JP	nc,LA7D9
+	LD	A,E
+	CP	0F8h
+	JP	nc,LA7D9
+	INC	HL
+	INC	HL
+	AND	4
+	RRA
+	ADD	A,L
+	LD	L,A
+	ADC	A,H
+	SUB	L
+	LD	H,A
+	LD	A,(HL)
+	INC	HL
+	LD	H,(HL)
+	LD	L,A
+	LD	A,C
+	AND	15
+	ADD	A,0EFh
+	LD	D,A
+	LD	A,E
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	XOR	C
+	AND	8Fh
+	XOR	C
+	RLCA
+	LD	E,A
+	LD	A,B
+	CP	(HL)
+	JP	m,LC026
+	LD	B,(HL)
+LC026:
+	INC	HL
+	LD	A,E
+	AND	1Fh
+	ADD	A,(HL)
+	SUB	20h
+	JP	nc,LB9F0
+	LD	A,(HL)
+	ADD	A,A
+	ADD	A,(HL)
+	LD	(0C038h),A
+	INC	HL
+LC037:
+	JR	LC037
+	DS 9,RELLENO
+	JP	LA804
+	DS 12,RELLENO
+LC051:
+	LD	A,(VELOCIDAD)
+	LD	HL,0E521h
+	ADD	A,(HL)
+	LD	(HL),A
+	INC	L
+	LD	A,(HL)
+	ADC	A,0
+	LD	(HL),A
+	INC	L
+	LD	A,(HL)
+	ADC	A,0
+	LD	(HL),A
+	CP	4
+	CALL	z,LB3F5
+	LD	A,(VELOCIDAD)
+	LD	HL,0E6EFh
+	ADD	A,(HL)
+	LD	(HL),A
+	LD	A,0
+	ADC	A,A
+	LD	(0E45Dh),A
+	RET	z
+	CALL	LEE_CURVA
+	LD	A,(0E522h)
+	OR	A
+	CALL	z,LB232
+	LD	A,(0E424h)
+	OR	A
+	CALL	z,L0EB4
+CURVA_ACTUAL:
+	LD	HL,(0E6F0h)
+	LD	A,20h
+	ADD	A,L
+	LD	L,A
+	LD	A,(HL)
+	LD	(0E46Dh),A
+	LD	E,A
+	RLA
+	SBC	A,A
+	LD	D,A
+	LD	HL,(0E6F2h)
+	ADD	HL,DE
+	LD	(0E6F2h),HL
+	LD	HL,(0E466h)
+	ADD	HL,DE
+	LD	(0E466h),HL
+	LD	HL,0E6F0h
+	LD	A,(HL)
+	INC	A
+	LD	(HL),A
+	ADD	A,1Fh
+	LD	L,A
+	LD	H,0EAh
+	LD	A,(0E6E6h)
+	DEC	A
+	LD	(0E6E6h),A
+	LD	A,(0E6E7h)
+	JR	nz,LC0D3
+	LD	DE,(0E4A6h)
+	LD	A,(DE)
+	OR	A
+	JR	nz,LC0C9
+	LD	DE,(0E49Ch)
+	LD	A,(DE)
+LC0C9:
+	LD	(0E6E6h),A
+	INC	DE
+	LD	A,(DE)
+	INC	DE
+	LD	(0E4A6h),DE
+LC0D3:
+	LD	(0E6E7h),A
+	LD	(HL),A
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(0E6E8h)
+	DEC	A
+	LD	(0E6E8h),A
+	LD	A,(0E6E9h)
+	JR	nz,LC0FE
+	LD	DE,(0E4A8h)
+	LD	A,(DE)
+	OR	A
+	JR	nz,LC0F4
+	LD	DE,(0E49Eh)
+	LD	A,(DE)
+LC0F4:
+	LD	(0E6E8h),A
+	INC	DE
+	LD	A,(DE)
+	INC	DE
+	LD	(0E4A8h),DE
+LC0FE:
+	LD	(0E6E9h),A
+	LD	(HL),A
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(0E6ECh)
+	DEC	A
+	LD	(0E6ECh),A
+	LD	A,(0E6EDh)
+	JR	nz,LC129
+	LD	DE,(0E4AAh)
+	LD	A,(DE)
+	OR	A
+	JR	nz,LC11F
+	LD	DE,(0E4A0h)
+	LD	A,(DE)
+LC11F:
+	LD	(0E6ECh),A
+	INC	DE
+	LD	A,(DE)
+	INC	DE
+	LD	(0E4AAh),DE
+LC129:
+	LD	(0E6EDh),A
+	LD	(HL),A
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	AND	3
+	JR	z,LC13E
+	LD	(HL),0
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	(HL),0
+	RET
+LC13E:
+	LD	A,(0E6EAh)
+	SUB	10h
+	JR	nc,LC158
+	LD	DE,(0E4ACh)
+	LD	A,(DE)
+	CP	0FFh
+	JR	nz,LC153
+	LD	DE,(0E4A2h)
+	LD	A,(DE)
+LC153:
+	INC	DE
+	LD	(0E4ACh),DE
+LC158:
+	LD	(0E6EAh),A
+	AND	15
+	CP	9
+	JR	nz,LC16A
+	LD	A,L
+	AND	4
+	LD	A,9
+	JR	z,LC16A
+	LD	A,4
+LC16A:
+	LD	(HL),A
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(0E6EBh)
+	SUB	10h
+	JR	nc,LC189
+	LD	DE,(0E4AEh)
+	LD	A,(DE)
+	CP	0FFh
+	JR	nz,LC184
+	LD	DE,(0E4A4h)
+	LD	A,(DE)
+LC184:
+	INC	DE
+	LD	(0E4AEh),DE
+LC189:
+	LD	(0E6EBh),A
+	AND	15
+	CP	9
+	JR	nz,LC19B
+	LD	A,L
+	AND	4
+	LD	A,9
+	JR	z,LC19B
+	LD	A,4
+LC19B:
+	LD	(HL),A
+	RET
+
+;----------------------------------------------------------------------
+; ORDENA_CARRERA: Orden de carrera (SORTORDER del original de Spectrum).
+;----------------------------------------------------------------------
+ORDENA_CARRERA:
+	LD	HL,0E6CBh
+	LD	BC,0B00h
+	LD	A,(HL)
+	LD	E,A
+	EXX
+	LD	C,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,21h
+	LD	L,A
+	LD	H,0E5h
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	INC	L
+	LD	B,(HL)
+	LD	(0C1D0h),DE
+	EXX
+LC1BB:
+	INC	L
+	LD	A,(HL)
+	LD	D,A
+	EXX
+	LD	C,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,A
+	ADD	A,A
+	ADD	A,C
+	ADD	A,21h
+	LD	L,A
+	LD	H,0E5h
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	INC	L
+	LD	C,(HL)
+	LD	HL,0
+	SBC	HL,DE
+	LD	A,B
+	SBC	A,C
+	JR	nc,LC1E1
+	EXX
+	DEC	L
+	LD	(HL),D
+	INC	L
+	LD	(HL),E
+	DJNZ	LC1BB
+	JR	LC1EA
+LC1E1:
+	LD	(0C1D0h),DE
+	LD	B,C
+	EXX
+	LD	E,D
+	DJNZ	LC1BB
+LC1EA:
+	LD	HL,0E6D6h
+	XOR	A
+	LD	BC,12
+	CPDR
+	LD	A,C
+	LD	(PUESTO),A
+	RET
+
+;----------------------------------------------------------------------
+; PINTA_RIVALES: Dibuja los coches rivales y el decorado lateral escalados.
+;----------------------------------------------------------------------
+PINTA_RIVALES:
+	LD	HL,0E5B3h
+	LD	(0E451h),HL
+	LD	HL,(0E6F0h)
+	LD	A,55h
+	ADD	A,L
+	LD	L,A
+	LD	(0E459h),HL
+	LD	A,(HL)
+	LD	(0E45Bh),A
+	LD	H,A
+	LD	L,0
+	LD	DE,85D8h
+	ADD	HL,DE
+	LD	A,(0E6F0h)
+	AND	1
+	JR	z,LC21E
+	LD	BC,18h
+	ADD	HL,BC
+LC21E:
+	LD	(0E455h),HL
+	LD	(0E457h),HL
+	LD	IY,0E484h
+	LD	IX,0EB2Ah
+	LD	A,15h
+	LD	(0E454h),A
+LC231:
+	LD	A,(IY-1)
+	OR	A
+	JP	p,LC259
+	LD	A,(IY)
+	OR	A
+	LD	A,(IY-1)
+	JP	p,LC259
+	LD	HL,(0E451h)
+	LD	A,(0E454h)
+	DEC	A
+LC249:
+	CP	(HL)
+	JR	nz,LC252
+	INC	L
+	INC	L
+	INC	L
+	INC	L
+	JR	LC249
+LC252:
+	LD	(0E451h),HL
+	DS 2,RELLENO	; DEC	IYL
+	JR	LC2AF
+LC259:
+	DS 2,RELLENO	; DEC	IYL
+	SUB	(IY+1)
+	JP	p,LC288
+	LD	HL,(0E459h)
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(HL)
+	OR	A
+	JR	z,LC272
+	CALL	LBFA2
+	CALL	LBD63
+LC272:
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(HL)
+	OR	A
+	JR	z,LC280
+	CALL	LBF83
+	CALL	LBD63
+LC280:
+	CALL	RIVAL_SIGUIENTE
+	CALL	FIGURA_ESCALADA_1
+	JR	LC2AF
+LC288:
+	CALL	FIGURA_ESCALADA_2
+	LD	HL,(0E459h)
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(HL)
+	OR	A
+	JR	z,LC29C
+	CALL	LBFA2
+	CALL	LBD63
+LC29C:
+	LD	A,L
+	ADD	A,20h
+	LD	L,A
+	LD	A,(HL)
+	OR	A
+	JR	z,LC2AC
+	CP	9
+	CALL	LBF83
+	CALL	LBD63
+LC2AC:
+	CALL	RIVAL_SIGUIENTE
+LC2AF:
+	LD	HL,0E459h
+	DEC	(HL)
+	DS 2,RELLENO	; DEC	IXL
+	DS 2,RELLENO	; DEC	IXL
+	LD	HL,0E454h
+	LD	A,(HL)
+	CP	8
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	CALL	z,EFECTOS_SONIDO
+	POP	BC
+	POP	DE
+	POP	HL
+	DEC	(HL)
+	JP	nz,LC231
+	RET
+FIGURA_ESCALADA_1:
+	PUSH	IX
+	LD	HL,(0E459h)
+	LD	A,(HL)
+	OR	A
+	JP	z,LC3F8
+	LD	A,(IY)
+	OR	A
+	LD	C,A
+	JP	p,LC2DF
+	LD	C,0
+LC2DF:
+	LD	A,(IY+1)
+	OR	A
+	JP	p,LC2E8
+	LD	A,7Fh
+LC2E8:
+	SUB	C
+	JR	nz,LC2EC
+	INC	A
+LC2EC:
+	LD	E,A
+	LD	A,C
+	EXX
+	LD	E,A
+	AND	15
+	ADD	A,0EFh
+	LD	D,A
+	LD	A,E
+	AND	70h
+	ADD	A,A
+	LD	E,A
+	EXX
+	LD	L,(IX-2)
+	LD	H,(IX-1)
+	LD	A,E
+	DEC	A
+	JR	nz,LC30B
+	LD	IX,(0E457h)
+	JR	LC328
+LC30B:
+	LD	IX,(0E455h)
+	LD	A,(0E6F0h)
+	RRA
+	JR	nc,LC31C
+	LD	A,B
+	LD	BC,80h
+	ADD	IX,BC
+	LD	B,A
+LC31C:
+	LD	A,B
+	LD	BC,0
+	AND	1
+	JR	z,LC326
+	LD	C,40h
+LC326:
+	ADD	IX,BC
+LC328:
+	LD	C,(HL)
+	INC	L
+	LD	A,(HL)
+	OR	A
+	JP	z,LC331
+	LD	C,0
+LC331:
+	INC	H
+	INC	H
+	LD	A,(HL)
+	DEC	L
+	LD	B,(HL)
+	OR	A
+	JP	z,LC340
+	LD	B,0FFh
+	LD	A,C
+	OR	A
+	JR	z,LC343
+LC340:
+	CALL	ESCALA_LINEA
+LC343:
+	DEC	HL
+	DEC	L
+	DEC	H
+	DEC	H
+	INC	IX
+	INC	IX
+	EXX
+	INC	D
+	INC	D
+	JP	nz,LC357
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0F0h
+LC357:
+	DEC	D
+	EXX
+	DEC	E
+	JP	nz,LC328
+	JP	LC3F4
+FIGURA_ESCALADA_2:
+	PUSH	IX
+	LD	HL,(0E459h)
+	LD	A,(HL)
+	OR	A
+	JP	z,LC3F8
+	LD	A,(IY+1)
+	LD	E,A
+	OR	A
+	JP	p,LC374
+	LD	E,0
+LC374:
+	LD	C,E
+	LD	A,(IY)
+	DEC	A
+	JP	p,LC37E
+	LD	A,7Fh
+LC37E:
+	INC	A
+	SUB	E
+	JR	nz,LC383
+	INC	A
+LC383:
+	LD	E,A
+	LD	A,C
+	EXX
+	LD	E,A
+	AND	15
+	ADD	A,0EFh
+	LD	D,A
+	LD	A,E
+	AND	70h
+	ADD	A,A
+	LD	E,A
+	EXX
+	LD	L,(IX)
+	LD	H,(IX+1)
+	LD	A,E
+	DEC	A
+	JR	nz,LC3A2
+	LD	IX,(0E457h)
+	JR	LC3BF
+LC3A2:
+	LD	IX,(0E455h)
+	LD	A,(0E6F0h)
+	RRA
+	JR	nc,LC3B3
+	LD	A,B
+	LD	BC,80h
+	ADD	IX,BC
+	LD	B,A
+LC3B3:
+	LD	A,B
+	LD	BC,0
+	AND	1
+	JR	z,LC3BD
+	LD	C,40h
+LC3BD:
+	ADD	IX,BC
+LC3BF:
+	LD	C,(HL)
+	INC	L
+	LD	A,(HL)
+	OR	A
+	JP	z,LC3C8
+	LD	C,0
+LC3C8:
+	INC	H
+	INC	H
+	DEC	L
+	LD	B,(HL)
+	INC	L
+	LD	A,(HL)
+	OR	A
+	JP	z,LC3D8
+	LD	B,0FFh
+	LD	A,C
+	OR	A
+	JR	z,LC3DB
+LC3D8:
+	CALL	ESCALA_LINEA
+LC3DB:
+	INC	HL
+	DEC	H
+	DEC	H
+	INC	IX
+	INC	IX
+	EXX
+	INC	D
+	INC	D
+	JP	nz,LC3EE
+	LD	A,E
+	ADD	A,20h
+	LD	E,A
+	LD	D,0F0h
+LC3EE:
+	DEC	D
+	EXX
+	DEC	E
+	JP	nz,LC3BF
+LC3F4:
+	LD	(0E457h),IX
+LC3F8:
+	LD	HL,(0E459h)
+	DEC	L
+	LD	D,(HL)
+	LD	HL,85D8h
+	ADD	HL,DE
+	LD	A,(0E454h)
+	SUB	15h
+	NEG
+	AND	0FEh
+	CALL	SUMA_A_HL
+	LD	(0E455h),HL
+	LD	A,(0E45Bh)
+	CP	D
+	JR	z,LC41D
+	LD	(0E457h),HL
+	LD	A,D
+	LD	(0E45Bh),A
+LC41D:
+	POP	IX
+	RET
+
+;----------------------------------------------------------------------
+; ESCALA_LINEA: Dibuja una línea de figura escalada; código que se modifica a sí mismo
+; y lee la máscara con POP (SP apuntando a E600h).
+;----------------------------------------------------------------------
+ESCALA_LINEA:
+	LD	A,B
+	AND	15
+	ADD	A,A
+	ADD	A,A
+	ADD	A,40h
+	LD	(0C461h),A
+	LD	A,B
+	AND	0F0h
+	RRCA
+	RRCA
+	RRCA
+	LD	B,A
+	EXX
+	XOR	E
+	AND	1Fh
+	XOR	E
+	INC	A
+	LD	E,A
+	EXX
+	RRC	B
+	LD	A,C
+	AND	15
+	ADD	A,A
+	ADD	A,A
+	LD	(0C48Bh),A
+	LD	A,C
+	AND	0F0h
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	LD	C,A
+	LD	A,11h
+	SUB	B
+	ADD	A,C
+	CP	11h
+	JR	nz,LC455
+	LD	A,26h
+LC455:
+	LD	(0C475h),A
+	EXX
+	LD	(0C49Dh),SP
+	LD	SP,IX
+	POP	BC
+	LD	SP,0E600h
+	POP	HL
+	LD	A,(DE)
+	XOR	C
+	AND	L
+	XOR	C
+	OR	H
+	LD	(DE),A
+	DEC	E
+	POP	HL
+	LD	A,(DE)
+	XOR	B
+	AND	L
+	XOR	B
+	OR	H
+	LD	(DE),A
+	EX	DE,HL
+	LD	SP,HL
+LC474:
+	JR	LC474
+	DS 2,RELLENO
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	PUSH	BC
+	LD	HL,0FFFEh
+	ADD	HL,SP
+	LD	SP,0E600h
+	POP	DE
+	LD	A,(HL)
+	XOR	C
+	AND	E
+	XOR	C
+	OR	D
+	LD	(HL),A
+	INC	L
+	POP	DE
+	LD	A,(HL)
+	XOR	B
+	AND	E
+	XOR	B
+	OR	D
+	LD	(HL),A
+	LD	SP,0
+	EX	DE,HL
+	EXX
+	RET
+
+;----------------------------------------------------------------------
+; BUFER_DIR: Dirección del búfer para la columna/línea en C,E.
+;----------------------------------------------------------------------
+BUFER_DIR:
+	LD	A,C
+	AND	15
+	ADD	A,0EFh
+	LD	D,A
+	LD	A,E
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	XOR	C
+	AND	8Fh
+	XOR	C
+	RLCA
+	LD	E,A
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 4,RELLENO
+PILOTO:
+	DS 1,RELLENO
+CONTROL:
+	DS 10,RELLENO
+ETAPA:
+	DS 14,RELLENO
+CREDITOS:
+	DS 3,RELLENO
+PUESTO:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 15,RELLENO
+BOTON_ANTERIOR:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 3,RELLENO
+CIRCUITO:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 8,RELLENO
+VELOCIDAD:
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 2,RELLENO
+
+;----------------------------------------------------------------------
+; MUSICA_PRESENTACION: Reproductor de música de la presentación (solo suena la primera vez:
+; durante la carrera esta zona se usa como búfer de pantalla).
+;----------------------------------------------------------------------
+MUSICA_PRESENTACION:
+	LD	A,0C3h
+	LD	(38h),A
+	LD	HL,INT_MUSICA
+	LD	(39h),HL
+	EI
+	XOR	A
+	LD	HL,(0EF7Dh)
+	CALL	SALTA_HL
+LEF13:
+	CALL	LEE_TECLA
+	AND	A
+	JR	z,LEF13
+	LD	HL,(0EF81h)
+	CALL	SALTA_HL
+	XOR	A
+	LD	E,0
+	LD	B,6
+LEF24:
+	CALL	PSG_ESCRIBE
+	INC	A
+	DJNZ	LEF24
+	LD	A,7
+	LD	E,0BFh
+	CALL	PSG_ESCRIBE
+	LD	A,E
+	LD	(PSG_R7),A
+	LD	A,11
+	LD	E,32h
+	CALL	PSG_ESCRIBE
+	INC	A
+	LD	E,0
+	CALL	PSG_ESCRIBE
+	LD	E,8
+	INC	A
+	CALL	PSG_ESCRIBE
+	LD	HL,INT_VACIA
+	LD	(39h),HL
+	JP	BUCLE_PRINCIPAL
+SALTA_HL:
+	JP	(HL)
+
+;----------------------------------------------------------------------
+; INT_MUSICA: Rutina de interrupción con música (IM 1 en 0038h).
+;----------------------------------------------------------------------
+INT_MUSICA:
+	PUSH	AF
+	IN	A,(99h)	; VDP: control
+	AND	A
+	JP	p,LEF79
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	PUSH	IX
+	PUSH	IY
+	EXX
+	PUSH	HL
+	PUSH	DE
+	PUSH	BC
+	EX	AF,AF'
+	PUSH	AF
+	LD	HL,(0EF7Fh)
+	CALL	SALTA_HL
+	POP	AF
+	EX	AF,AF'
+	POP	BC
+	POP	DE
+	POP	HL
+	EXX
+	POP	IY
+	POP	IX
+	POP	BC
+	POP	DE
+	POP	HL
+LEF79:
+	POP	AF
+	EI
+	RETI
+	DS 6,RELLENO
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,14
+	LD	E,A
+	ADC	A,0F8h
+	SUB	E
+	LD	D,A
+	CALL	LF084
+	LD	A,(DE)
+	INC	DE
+	LD	(0F034h),A
+	LD	H,0F3h
+	CALL	LEFA9
+	CALL	LEFA9
+	CALL	LEFA9
+	LD	A,1
+	LD	(0F018h),A
+	LD	(0F0E2h),A
+	RET
+LEFA9:
+	LD	L,5
+	LD	(HL),1
+	DEC	L
+	XOR	A
+	LD	(HL),A
+	LD	L,7
+	LD	(HL),A
+	LD	L,9
+	LD	(HL),A
+	LD	L,15h
+	LD	(HL),A
+	LD	A,(DE)
+	INC	DE
+	LD	C,A
+	LD	A,(DE)
+	INC	DE
+	LD	B,A
+	LD	L,2
+	LD	A,(BC)
+	LD	(HL),A
+	INC	BC
+	INC	L
+	LD	A,(BC)
+	LD	(HL),A
+	INC	BC
+	LD	L,0
+	LD	(HL),C
+	INC	L
+	LD	(HL),B
+	INC	H
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 8,RELLENO
+LF007:
+	LD	A,(0EFD0h)
+	OR	A
+	RET	z
+	CALL	LF0A0
+	LD	H,0F7h
+	JP	LF056
+	CALL	LF0BE
+	LD	A,0
+	OR	A
+	JR	z,LF007
+	LD	HL,0F0E2h
+	DEC	(HL)
+	LD	H,0F3h
+	CALL	LF0CF
+	INC	H
+	CALL	LF0CF
+	INC	H
+	CALL	LF0CF
+	LD	A,(0F0E2h)
+	OR	A
+	JR	nz,LF038
+	LD	A,1
+	LD	(0F0E2h),A
+LF038:
+	LD	A,(0F018h)
+	OR	A
+	JR	z,LF007
+	LD	A,(0EFD0h)
+	OR	A
+	JR	nz,LF049
+	LD	A,0F5h
+	LD	(0F055h),A
+LF049:
+	CALL	LF0A0
+	LD	H,0F3h
+	CALL	LF056
+	CALL	LF056
+	LD	H,0F5h
+LF056:
+	LD	L,6
+	LD	A,(HL)
+	LD	BC,0A0h
+	OUT	(C),A
+	INC	HL
+	LD	A,(HL)
+	LD	BC,0A1h
+	OUT	(C),A
+	INC	HL
+	LD	A,(HL)
+	LD	BC,0A0h
+	OUT	(C),A
+	INC	HL
+	LD	A,(HL)
+	LD	BC,0A1h
+	OUT	(C),A
+	INC	HL
+	LD	A,(HL)
+	LD	BC,0A0h
+	OUT	(C),A
+	INC	HL
+	LD	A,(HL)
+	LD	BC,0A1h
+	OUT	(C),A
+	INC	HL
+	INC	H
+	RET
+LF084:
+	XOR	A
+	LD	(0F018h),A
+	LD	(0EFD0h),A
+	LD	(0F3C4h),A
+	LD	A,7
+	LD	BC,0A0h
+	OUT	(C),A
+	LD	A,0BFh
+	LD	BC,0A1h
+	OUT	(C),A
+	LD	(0F0D2h),A
+	RET
+LF0A0:
+	LD	A,6
+	LD	BC,0A0h
+	OUT	(C),A
+	LD	A,1
+	LD	BC,0A1h
+	OUT	(C),A
+	LD	A,7
+	LD	BC,0A0h
+	OUT	(C),A
+	LD	A,(0F0D2h)
+	LD	BC,0A1h
+	OUT	(C),A
+	RET
+LF0BE:
+	LD	A,(0EFD0h)
+	OR	A
+	RET	z
+	LD	HL,0F702h
+	LD	A,H
+	LD	(0F055h),A
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	JR	LF0E6
+LF0CF:
+	LD	L,20h
+	LD	A,0
+	AND	(HL)
+	JR	nz,LF0DC
+	LD	L,7
+	LD	A,(HL)
+	LD	(0F0A8h),A
+LF0DC:
+	LD	L,2
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	LD	A,0
+	OR	A
+	JR	nz,LF0F1
+LF0E6:
+	LD	L,5
+	DEC	(HL)
+	JR	z,LF11D
+	CALL	LF39D
+	CALL	LF1D6
+LF0F1:
+	CALL	LF5ED
+	CALL	LF569
+	CALL	LF562
+	CALL	LF59D
+	CALL	LF3A8
+	CALL	LF4E2
+	LD	L,4
+	BIT	5,(HL)
+	RET	z
+	LD	A,R
+	AND	7
+	LD	C,A
+	LD	L,7
+	LD	A,(0F307h)
+	ADD	A,C
+	LD	(HL),A
+	LD	A,(0F309h)
+	LD	L,9
+	LD	(HL),A
+	RET	nc
+	INC	(HL)
+	RET
+LF11D:
+	LD	A,(DE)
+	INC	DE
+	OR	A
+	JP	m,LF15B
+	LD	L,12
+	LD	(HL),A
+	LD	L,2
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	CALL	LF3C3
+	LD	L,14h
+	LD	A,(HL)
+	LD	L,11
+	LD	(HL),A
+	LD	L,13
+	LD	A,(HL)
+	LD	L,5
+	LD	(HL),A
+	LD	L,18h
+	LD	(HL),0
+	LD	L,2Dh
+	LD	A,(HL)
+	SRL	A
+	DEC	L
+	LD	(HL),A
+	LD	L,14
+	CALL	LF14B
+	INC	L
+LF14B:
+	LD	A,(HL)
+	LD	C,A
+	AND	15
+	INC	L
+	LD	(HL),A
+	LD	A,C
+	RRA
+	RRA
+	RRA
+	RRA
+	AND	15
+	INC	L
+	LD	(HL),A
+	RET
+LF15B:
+	CP	0E0h
+	JR	nc,LF183
+	CP	0D0h
+	JR	nc,LF193
+	CP	0C0h
+	JR	nc,LF18B
+	CP	0B0h
+	JR	nc,LF1BA
+	LD	C,H
+	ADD	A,A
+	ADD	A,2Eh
+	LD	L,A
+	ADC	A,0F4h
+	SUB	L
+	LD	H,A
+	LD	A,C
+	LD	C,(HL)
+	INC	HL
+	LD	B,(HL)
+	LD	H,A
+	LD	(0F17Eh),BC
+	CALL	00h
+	JP	LF11D
+LF183:
+	SUB	0DFh
+	LD	L,13
+	LD	(HL),A
+	JP	LF11D
+LF18B:
+	SUB	0C0h
+	LD	L,14h
+	LD	(HL),A
+	JP	LF11D
+LF193:
+	SUB	0D0h
+	LD	L,14h
+	LD	(HL),A
+	EX	DE,HL
+	LD	E,14
+	LDI
+	LD	E,11h
+	LDI
+	EX	DE,HL
+	LD	A,(DE)
+	RRA
+	RRA
+	RRA
+	RRA
+	AND	15
+	LD	L,19h
+	LD	(HL),A
+	INC	L
+	LD	(HL),A
+	LD	A,(DE)
+	AND	15
+	LD	L,1Bh
+	LD	(HL),A
+	INC	L
+	LD	(HL),A
+	INC	DE
+	JP	LF11D
+LF1BA:
+	SUB	0B0h
+	ADD	A,A
+	ADD	A,32h
+	LD	C,A
+	ADC	A,0F2h
+	SUB	C
+	LD	B,A
+	LD	A,(BC)
+	LD	L,21h
+	LD	(HL),A
+	INC	L
+	INC	BC
+	LD	A,(BC)
+	LD	(HL),A
+	INC	L
+	LD	(HL),0
+	LD	L,4
+	SET	0,(HL)
+	JP	LF11D
+LF1D6:
+	LD	L,16h
+	LD	A,(HL)
+	LD	L,5
+	CP	(HL)
+	RET	nz
+	LD	A,(DE)
+	CP	8Eh
+	RET	z
+	LD	L,18h
+	LD	(HL),1
+	LD	L,15h
+	LD	(HL),0
+	LD	L,4
+	RES	1,(HL)
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	RES	4,(HL)
+	RES	0,(HL)
+	LD	A,H
+	CP	0F5h
+	JR	z,LF34C
+LF347:
+	LD	A,C
+	LD	(0F0D2h),A
+	RET
+LF34C:
+	LD	A,(0EFD0h)
+	OR	A
+	JR	z,LF347
+	LD	A,C
+	LD	(0F1FAh),A
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 5,RELLENO
+	POP	AF
+	LD	L,13
+	LD	A,(HL)
+	LD	L,5
+	LD	(HL),A
+	LD	L,2
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	RET
+	DS 3,RELLENO
+	LD	L,1Fh
+	OR	(HL)
+	INC	L
+	OR	(HL)
+	LD	C,A
+	RET
+	DS 5,RELLENO
+	LD	L,15h
+	LD	(HL),0FFh
+	RET
+LF39D:
+	LD	L,15h
+	LD	A,(HL)
+	OR	A
+	RET	z
+	LD	L,12
+	ADD	A,(HL)
+	LD	(HL),A
+	JR	LF3C3
+LF3A8:
+	LD	L,4
+	BIT	0,(HL)
+	RET	z
+	LD	L,21h
+	LD	A,(HL)
+	INC	L
+	LD	B,(HL)
+	INC	L
+	ADD	A,(HL)
+	LD	C,A
+	JR	nc,LF3B8
+	INC	B
+LF3B8:
+	INC	(HL)
+	LD	A,(BC)
+	OR	A
+	JP	p,LF3C0
+	LD	(HL),0
+LF3C0:
+	LD	L,12
+	ADD	A,(HL)
+LF3C3:
+	ADD	A,0
+	ADD	A,A
+	ADD	A,2Eh
+	LD	C,A
+	ADC	A,0F7h
+	SUB	C
+	LD	B,A
+	LD	A,(BC)
+	INC	BC
+	LD	L,7
+	LD	(HL),A
+	LD	A,(BC)
+	LD	L,9
+	LD	(HL),A
+	LD	L,4
+	BIT	2,(HL)
+	RET	z
+	PUSH	DE
+	LD	L,27h
+	LD	E,(HL)
+	INC	L
+	LD	D,(HL)
+	LD	L,7
+	LD	C,(HL)
+	LD	L,9
+	LD	B,(HL)
+	EX	DE,HL
+	ADD	HL,BC
+	EX	DE,HL
+	LD	(HL),D
+	LD	L,7
+	LD	(HL),E
+	POP	DE
+	LD	L,29h
+	LD	A,(HL)
+	LD	L,26h
+	LD	(HL),A
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	LD	B,(HL)
+	LD	A,(BC)
+	LD	E,A
+	INC	BC
+	LD	A,(BC)
+	INC	BC
+	LD	D,A
+	OR	E
+	JR	z,LF4D9
+	LD	(HL),B
+	DEC	L
+	LD	(HL),C
+	INC	L
+	INC	L
+	LD	(HL),E
+	INC	L
+	LD	(HL),D
+	RET
+LF4D9:
+	LD	D,B
+	LD	E,C
+	POP	BC
+	LD	A,(0FBADh)
+	JP	LF15B
+LF4E2:
+	LD	L,4
+	BIT	4,(HL)
+	RET	z
+	LD	L,1Fh
+	LD	A,(HL)
+	INC	L
+	OR	(HL)
+	LD	C,A
+	LD	A,(0F0D2h)
+	XOR	C
+	LD	(0F0D2h),A
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 13,RELLENO
+LF562:
+	LD	L,4
+	BIT	2,(HL)
+	JR	nz,LF56E
+	RET
+LF569:
+	LD	L,4
+	BIT	1,(HL)
+	RET	z
+LF56E:
+	LD	L,26h
+	DEC	(HL)
+	JP	m,LF640
+	LD	L,25h
+	BIT	7,(HL)
+	JR	nz,LF589
+	LD	L,24h
+	LD	A,(HL)
+	LD	L,7
+	ADD	A,(HL)
+	LD	(HL),A
+	LD	L,25h
+	LD	A,(HL)
+	LD	L,9
+	ADC	A,(HL)
+	LD	(HL),A
+	RET
+LF589:
+	LD	L,7
+	LD	A,(HL)
+	LD	L,24h
+	SUB	(HL)
+	LD	L,7
+	LD	(HL),A
+	LD	L,25h
+	LD	C,(HL)
+	RES	7,C
+	LD	L,9
+	LD	A,(HL)
+	SBC	A,C
+	LD	(HL),A
+	RET
+LF59D:
+	DEC	DE
+	LD	A,(DE)
+	INC	DE
+	CP	8Eh
+	JR	z,LF5AE
+	LD	L,13
+	LD	A,(HL)
+	LD	L,2Ah
+	SUB	(HL)
+	LD	L,5
+	CP	(HL)
+	RET	c
+LF5AE:
+	LD	L,4
+	BIT	3,(HL)
+	RET	z
+	BIT	6,(HL)
+	JR	z,LF5D1
+	LD	L,2Ch
+	DEC	(HL)
+	JR	nz,LF5C5
+	INC	L
+	LD	A,(HL)
+	DEC	L
+	LD	(HL),A
+	LD	L,4
+	RES	6,(HL)
+	RET
+LF5C5:
+	LD	L,2Bh
+	LD	A,(HL)
+	LD	L,7
+	ADD	A,(HL)
+	LD	(HL),A
+	RET	nc
+	LD	L,9
+	INC	(HL)
+	RET
+LF5D1:
+	LD	L,2Ch
+	DEC	(HL)
+	JR	nz,LF5DF
+	INC	L
+	LD	A,(HL)
+	DEC	L
+	LD	(HL),A
+	LD	L,4
+	SET	6,(HL)
+	RET
+LF5DF:
+	LD	L,7
+	LD	A,(HL)
+	LD	L,2Bh
+	SUB	(HL)
+	LD	L,7
+	LD	(HL),A
+	RET	nc
+	LD	L,9
+	DEC	(HL)
+	RET
+LF5ED:
+	LD	L,15
+	LD	A,(HL)
+	OR	A
+	JR	z,LF608
+	LD	L,19h
+	DEC	(HL)
+	RET	nz
+	INC	L
+	LD	A,(HL)
+	DEC	L
+	LD	(HL),A
+	LD	L,15
+	DEC	(HL)
+	INC	L
+	LD	A,(HL)
+	LD	L,11
+	ADD	A,(HL)
+	CP	15
+	RET	nc
+	LD	(HL),A
+	RET
+LF608:
+	LD	L,12h
+	LD	A,(HL)
+	OR	A
+	JR	z,LF626
+	LD	L,1Bh
+	DEC	(HL)
+	RET	nz
+	INC	L
+	LD	A,(HL)
+	DEC	L
+	LD	(HL),A
+	LD	L,12h
+	DEC	(HL)
+	LD	L,11
+	LD	A,(HL)
+	LD	L,13h
+	SUB	(HL)
+	JR	nc,LF622
+	XOR	A
+LF622:
+	LD	L,11
+	LD	(HL),A
+	RET
+LF626:
+	LD	L,18h
+	LD	A,(HL)
+	OR	A
+	RET	z
+	LD	L,1Dh
+	DEC	(HL)
+	RET	nz
+	INC	L
+	LD	A,(HL)
+	DEC	L
+	LD	(HL),A
+	LD	L,11
+	LD	A,(HL)
+	LD	L,17h
+	SUB	(HL)
+	JR	nc,LF63C
+	XOR	A
+LF63C:
+	LD	L,11
+	LD	(HL),A
+	RET
+LF640:
+	INC	(HL)
+	RET
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 16,RELLENO
+	DS 3,RELLENO

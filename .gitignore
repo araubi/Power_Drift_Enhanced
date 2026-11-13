@@ -1,0 +1,11 @@
+# datos sacados de la cinta del usuario: nunca al repositorio
+originales/
+*.cas
+*.tsx
+*.dsk
+# lo que genera el montaje
+rom/PowerDrift_SCC.rom
+rom/_*
+rom/*.bin
+rom/*_sim.inc
+__pycache__/
